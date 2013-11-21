@@ -1,0 +1,18 @@
+// comments are OK :)
+// single quotes, double quotes, and no quotes are OK
+{
+  textures: {
+    cockpit: {
+      images: {
+        arrow: {
+          path: "img/arrow.png",
+          anchor: "left"
+        },
+        'radar-circle': {
+          path: "img/radar-circle.png",
+          anchor: "center"
+        }
+      }
+    }
+  }
+}

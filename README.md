@@ -1,6 +1,6 @@
 # rucksack
 
-Open-source texture packer.
+(work in progress) Open-source texture packer.
 
 ## Usage
 

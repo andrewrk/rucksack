@@ -27,6 +27,31 @@ enum State {
     StateImagePropPath,
     StateExpectTextureObject,
     StateTextureProp,
+    StateTextureMaxWidth,
+    StateTextureMaxHeight,
+    StateTexturePow2,
+};
+
+static const char *STATE_STR[] = {
+    "StateStart",
+    "StateTopLevelProp",
+    "StateDone",
+    "StateTextures",
+    "StateTextureName",
+    "StateExpectImagesObject",
+    "StateImageName",
+    "StateImageObjectBegin",
+    "StateImagePropName",
+    "StateImagePropAnchor",
+    "StateImagePropAnchorObject",
+    "StateImagePropAnchorX",
+    "StateImagePropAnchorY",
+    "StateImagePropPath",
+    "StateExpectTextureObject",
+    "StateTextureProp",
+    "StateTextureMaxWidth",
+    "StateTextureMaxHeight",
+    "StateTexturePow2",
 };
 
 static enum State state;
@@ -55,25 +80,6 @@ static char *mystrdup (const char *s) {
     strcpy(d, s);
     return d;
 }
-
-static const char *STATE_STR[] = {
-    "StateStart",
-    "StateTopLevelProp",
-    "StateDone",
-    "StateTextures",
-    "StateTextureName",
-    "StateExpectImagesObject",
-    "StateImageName",
-    "StateImageObjectBegin",
-    "StateImagePropName",
-    "StateImagePropAnchor",
-    "StateImagePropAnchorObject",
-    "StateImagePropAnchorX",
-    "StateImagePropAnchorY",
-    "StateImagePropPath",
-    "StateExpectTextureObject",
-    "StateTextureProp",
-};
 
 static const char *ERR_STR[] = {
     "",
@@ -198,6 +204,12 @@ static int on_string(struct LaxJsonContext *json, enum LaxJsonType type,
         case StateTextureProp:
             if (strcmp(value, "images") == 0) {
                 state = StateExpectImagesObject;
+            } else if (strcmp(value, "maxWidth") == 0) {
+                state = StateTextureMaxWidth;
+            } else if (strcmp(value, "maxHeight") == 0) {
+                state = StateTextureMaxHeight;
+            } else if (strcmp(value, "pow2") == 0) {
+                state = StateTexturePow2;
             } else {
                 snprintf(strbuf, sizeof(strbuf), "unknown texture property: %s", value);
                 return parse_error(strbuf);
@@ -235,6 +247,18 @@ static int on_number(struct LaxJsonContext *json, double x) {
             break;
         case StateImagePropPath:
             return parse_error("expected string, not number");
+        case StateTextureMaxWidth:
+            if (x != (double)(int)x)
+                return parse_error("expected integer");
+            page->max_width = (int)x;
+            state = StateTextureProp;
+            break;
+        case StateTextureMaxHeight:
+            if (x != (double)(int)x)
+                return parse_error("expected integer");
+            page->max_height = (int)x;
+            state = StateTextureProp;
+            break;
         default:
             return parse_error("unexpected number");
     }
@@ -259,6 +283,16 @@ static int on_primitive(struct LaxJsonContext *json, enum LaxJsonType type) {
             return parse_error("expected object or string, not primitive");
         case StateImagePropPath:
             return parse_error("expected string, not primitive");
+        case StateTexturePow2:
+            if (type == LaxJsonTypeTrue) {
+                page->pow2 = 1;
+            } else if (type == LaxJsonTypeFalse) {
+                page->pow2 = 0;
+            } else {
+                return parse_error("expected true or false");
+            }
+            state = StateTextureProp;
+            break;
         default:
             return parse_error("unexpected primitive");
     }

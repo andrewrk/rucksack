@@ -16,8 +16,8 @@ struct RuckSackBundlePrivate {
 };
 
 struct RuckSackImagePrivate {
-    char *key;
     struct RuckSackImage externals;
+    char *key;
     FIBITMAP *bmp;
 
     int x;
@@ -98,6 +98,7 @@ void rucksack_page_destroy(struct RuckSackPage *page) {
         p->images_count -= 1;
         struct RuckSackImagePrivate *img = &p->images[p->images_count];
         free(img->key);
+        FreeImage_Unload(img->bmp);
     }
     free(p->images);
     free(p->free_positions);
@@ -196,31 +197,34 @@ int rucksack_page_add_image(struct RuckSackPage *page, const char *key,
 }
 
 static int compare_images(const void *a, const void *b) {
-    const struct RuckSackImage *img_a = a;
-    const struct RuckSackImage *img_b = b;
+    const struct RuckSackImagePrivate *img_a = a;
+    const struct RuckSackImagePrivate *img_b = b;
+
+    const struct RuckSackImage *image_a = &img_a->externals;
+    const struct RuckSackImage *image_b = &img_b->externals;
 
     int max_dim_a;
     int other_dim_a;
-    if (img_a->width > img_a->height) {
-        max_dim_a = img_a->width;
-        other_dim_a = img_a->height;
+    if (image_a->width > image_a->height) {
+        max_dim_a = image_a->width;
+        other_dim_a = image_a->height;
     } else {
-        max_dim_a = img_a->height;   
-        other_dim_a = img_a->width;
+        max_dim_a = image_a->height;
+        other_dim_a = image_a->width;
     }
 
     int max_dim_b;
     int other_dim_b;
-    if (img_b->width > img_b->height) {
-        max_dim_b = img_b->width;
-        other_dim_b = img_b->height;
+    if (image_b->width > image_b->height) {
+        max_dim_b = image_b->width;
+        other_dim_b = image_b->height;
     } else {
-        max_dim_b = img_b->height;   
-        other_dim_b = img_b->width;
+        max_dim_b = image_b->height;
+        other_dim_b = image_b->width;
     }
 
-    int delta = max_dim_a - max_dim_b;
-    return (delta == 0) ? (other_dim_a - other_dim_b) : delta;
+    int delta = max_dim_b - max_dim_a;
+    return (delta == 0) ? (other_dim_b - other_dim_a) : delta;
 }
 
 static struct Rect *add_free_rect(struct RuckSackPagePrivate *p) {
@@ -515,20 +519,28 @@ int rucksack_bundle_add_page(struct RuckSackBundle *bundle, const char *key,
 
         int img_pitch = FreeImage_GetPitch(img->bmp);
         BYTE *img_bits = FreeImage_GetBits(img->bmp);
-        for (int y = 0; y < image->height; y += 1) {
-            for (int x = 0; x < image->width; x += 1) {
-                int offset = img->r90 ?
-                    (out_pitch * x + (image->height - y - 1) * 4) :
-                    (out_pitch * y + x * 4);
-                memcpy(out_bits + offset, img_bits + x * 4, 4);
+        BYTE *out_bits_ptr = out_bits + out_pitch * img->y + 4 * img->x;
+        if (img->r90) {
+            for (int x = image->width - 1; x >= 0; x -= 1) {
+                for (int y = 0; y < image->height; y += 1) {
+                    int src_offset = img_pitch * y + 4 * x;
+                    memcpy(out_bits_ptr + y * 4, img_bits + src_offset, 4);
+                }
+                out_bits_ptr += out_pitch;
             }
-            img_bits += img_pitch;
+        } else {
+            for (int y = 0; y < image->height; y += 1) {
+                memcpy(out_bits_ptr, img_bits, image->width * 4);
+                out_bits_ptr += out_pitch;
+                img_bits += img_pitch;
+            }
         }
     }
 
     // write it to a memory buffer
     FIMEMORY *out_stream = FreeImage_OpenMemory(NULL, 0);
     FreeImage_SaveToMemory(FIF_PNG, out_bmp, out_stream, 0);
+    FreeImage_Unload(out_bmp);
 
     // write that to a debug file
     BYTE *data;

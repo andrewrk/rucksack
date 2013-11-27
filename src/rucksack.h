@@ -25,7 +25,6 @@ struct RuckSackImage {
     int anchor_x;
     int anchor_y;
 
-    char *key;
     unsigned int width;
     unsigned int height;
     // triangle strip

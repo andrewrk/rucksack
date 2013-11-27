@@ -8,7 +8,6 @@
 #include <limits.h>
 
 
-#define MIN(x, y) ((x) < (y) ? (x) : (y))
 #define MAX(x, y) ((x) > (y) ? (x) : (y))
 
 struct RuckSackBundlePrivate {
@@ -17,6 +16,7 @@ struct RuckSackBundlePrivate {
 };
 
 struct RuckSackImagePrivate {
+    char *key;
     struct RuckSackImage externals;
     FIBITMAP *bmp;
 
@@ -96,8 +96,7 @@ void rucksack_page_destroy(struct RuckSackPage *page) {
     struct RuckSackPagePrivate *p = (struct RuckSackPagePrivate *) page;
     while (p->images_count) {
         p->images_count -= 1;
-        struct RuckSackImagePrivate *i = &p->images[p->images_count];
-        struct RuckSackImage *img = &i->externals;
+        struct RuckSackImagePrivate *img = &p->images[p->images_count];
         free(img->key);
     }
     free(p->images);
@@ -191,7 +190,7 @@ int rucksack_page_add_image(struct RuckSackPage *page, const char *key,
             assert(0);
     }
 
-    img->key = mystrdup(key);
+    i->key = mystrdup(key);
 
     return 0;
 }
@@ -245,6 +244,9 @@ static struct Rect *add_free_rect(struct RuckSackPagePrivate *p) {
     }
     struct Rect *ptr = &p->free_positions[p->free_pos_count];
     p->free_pos_count += 1;
+
+    fprintf(stderr, "add_free_rect. garbage count: %d, free_pos_count: %d\n",
+            p->garbage_count, p->free_pos_count);
     return ptr;
 }
 
@@ -260,6 +262,16 @@ static void remove_free_rect(struct RuckSackPagePrivate *p, struct Rect *r) {
         next_free_pos_count -= 1;
         p->garbage_count -= 1;
     }
+
+    fprintf(stderr, "remove_free_rect. garbage count: %d, free_pos_count: %d\n",
+            p->garbage_count, p->free_pos_count);
+}
+
+static char rects_intersect(struct Rect *r1, struct Rect *r2) {
+    return (r1->x < r2->x + r2->w &&
+            r2->x < r1->x + r1->w &&
+            r1->y < r2->y + r2->h &&
+            r2->y < r1->y + r1->h);
 }
 
 static int do_maxrect_bssf(struct RuckSackPage *page) {
@@ -278,8 +290,8 @@ static int do_maxrect_bssf(struct RuckSackPage *page) {
     r->h = page->max_height;
 
     // keep track of the actual page size
-    p->width = INT_MIN;
-    p->height = INT_MAX;
+    p->width = 0;
+    p->height = 0;
 
     for (int i = 0; i < p->images_count; i += 1) {
         struct RuckSackImagePrivate *img = &p->images[i];
@@ -326,22 +338,27 @@ static int do_maxrect_bssf(struct RuckSackPage *page) {
             return -1;
         }
 
-        // place image at bottom left of this rect
-        int img_w = best_short_side_is_r90 ? image->height : image->width;
-        int img_h = best_short_side_is_r90 ? image->width : image->height;
+        // place image at top left of this rect
+        struct Rect img_rect;
+        img_rect.x = best_rect->x;
+        img_rect.y = best_rect->y;
+        img_rect.w = best_short_side_is_r90 ? image->height : image->width;
+        img_rect.h = best_short_side_is_r90 ? image->width : image->height;
 
-        img->x = best_rect->x;
-        img->y = best_rect->y + best_rect->h - img_h;
+        img->x = img_rect.x;
+        img->y = img_rect.y;
         img->r90 = best_short_side_is_r90;
+        fprintf(stderr, "placed image at %d, %d %s\n", img->x, img->y,
+                img->r90 ? "sideways" : "");
 
         // keep track of page boundaries
-        p->width = MAX(img->x + img_w, p->width);
-        p->height = MAX(img->y + img_h, p->height);
+        p->width = MAX(img->x + img_rect.w, p->width);
+        p->height = MAX(img->y + img_rect.h, p->height);
 
         // insert the two new rectangles into our set
         struct Rect *horiz = add_free_rect(p);
         horiz->x = best_rect->x;
-        horiz->y = best_rect->y;
+        horiz->y = best_rect->y + image->height;
         horiz->w = best_rect->w;
         horiz->h = best_rect->h - image->height;
 
@@ -363,55 +380,51 @@ static int do_maxrect_bssf(struct RuckSackPage *page) {
                 continue;
             }
 
-            struct Rect outer;
-            char intersected = 0;
+            if (rects_intersect(free_r, &img_rect)) {
+                struct Rect outer;
 
-            // check left side
-            outer.x = free_r->x;
-            outer.y = free_r->y;
-            outer.w = img->x - free_r->x;
-            outer.h = free_r->h;
-            if (outer.w > 0) {
-                intersected = 1;
-                struct Rect *new_free_rect = add_free_rect(p);
-                *new_free_rect = outer;
-            }
+                // check left side
+                outer.x = free_r->x;
+                outer.y = free_r->y;
+                outer.w = img->x - free_r->x;
+                outer.h = free_r->h;
+                if (outer.w > 0) {
+                    struct Rect *new_free_rect = add_free_rect(p);
+                    *new_free_rect = outer;
+                }
 
-            // check right side
-            outer.x = img->x + img_w;
-            outer.y = free_r->y;
-            outer.w = free_r->x + free_r->w - outer.x;
-            outer.h = free_r->h;
-            if (outer.w > 0) {
-                intersected = 1;
-                struct Rect *new_free_rect = add_free_rect(p);
-                *new_free_rect = outer;
-            }
+                // check right side
+                outer.x = img->x + img_rect.w;
+                outer.y = free_r->y;
+                outer.w = free_r->x + free_r->w - outer.x;
+                outer.h = free_r->h;
+                if (outer.w > 0) {
+                    struct Rect *new_free_rect = add_free_rect(p);
+                    *new_free_rect = outer;
+                }
 
-            // check top side
-            outer.x = free_r->x;
-            outer.y = free_r->y;
-            outer.w = free_r->w;
-            outer.h = img->y - free_r->y;
-            if (outer.h > 0) {
-                intersected = 1;
-                struct Rect *new_free_rect = add_free_rect(p);
-                *new_free_rect = outer;
-            }
+                // check top side
+                outer.x = free_r->x;
+                outer.y = free_r->y;
+                outer.w = free_r->w;
+                outer.h = img->y - free_r->y;
+                if (outer.h > 0) {
+                    struct Rect *new_free_rect = add_free_rect(p);
+                    *new_free_rect = outer;
+                }
 
-            // check bottom side
-            outer.x = free_r->x;
-            outer.y = img->y + img_h;
-            outer.w = free_r->w;
-            outer.h = free_r->y + free_r->h - outer.y;
-            if (outer.h > 0) {
-                intersected = 1;
-                struct Rect *new_free_rect = add_free_rect(p);
-                *new_free_rect = outer;
-            }
+                // check bottom side
+                outer.x = free_r->x;
+                outer.y = img->y + img_rect.h;
+                outer.w = free_r->w;
+                outer.h = free_r->y + free_r->h - outer.y;
+                if (outer.h > 0) {
+                    struct Rect *new_free_rect = add_free_rect(p);
+                    *new_free_rect = outer;
+                }
 
-            if (intersected)
                 remove_free_rect(p, free_r);
+            }
         }
 
         // now we loop over the free rectangle set again looking for and
@@ -434,8 +447,8 @@ static int do_maxrect_bssf(struct RuckSackPage *page) {
                 int x_diff = free_r1->x - free_r2->x;
                 int y_diff = free_r1->y - free_r2->y;
                 if (x_diff >= 0 && y_diff >= 0 &&
-                    free_r1->w < free_r2->w - x_diff &&
-                    free_r1->h < free_r2->h - y_diff)
+                    free_r1->w <= free_r2->w - x_diff &&
+                    free_r1->h <= free_r2->h - y_diff)
                 {
                     remove_free_rect(p, free_r1);
                     continue;
@@ -445,8 +458,8 @@ static int do_maxrect_bssf(struct RuckSackPage *page) {
                 x_diff = free_r2->x - free_r1->x;
                 y_diff = free_r2->y - free_r1->y;
                 if (x_diff >= 0 && y_diff >= 0 &&
-                    free_r2->w < free_r1->w - x_diff &&
-                    free_r2->h < free_r1->h - y_diff)
+                    free_r2->w <= free_r1->w - x_diff &&
+                    free_r2->h <= free_r1->h - y_diff)
                 {
                     remove_free_rect(p, free_r2);
                     continue;
@@ -505,8 +518,8 @@ int rucksack_bundle_add_page(struct RuckSackBundle *bundle, const char *key,
         for (int y = 0; y < image->height; y += 1) {
             for (int x = 0; x < image->width; x += 1) {
                 int offset = img->r90 ?
-                    (out_pitch * x + (image->height - y - 1) * 32) :
-                    (out_pitch * y + x * 32);
+                    (out_pitch * x + (image->height - y - 1) * 4) :
+                    (out_pitch * y + x * 4);
                 memcpy(out_bits + offset, img_bits + x * 4, 4);
             }
             img_bits += img_pitch;

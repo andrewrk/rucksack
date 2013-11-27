@@ -6,13 +6,13 @@
       images: {
         arrow: {
           path: "img/arrow.png",
-          anchor: "left"
+          anchor: "left",
         },
-        'radar-circle': {
+        radarCircle: {
           path: "img/radar-circle.png",
           anchor: "center"
-        }
-      }
-    }
-  }
+        },
+      },
+    },
+  },
 }

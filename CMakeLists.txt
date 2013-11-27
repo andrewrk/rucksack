@@ -26,6 +26,14 @@ else(FreeImage_FOUND)
   set(STATUS_FREEIMG "not found")
 endif(FreeImage_FOUND)
 
+# check for laxjson
+find_package(LaxJson)
+if(LAXJSON_FOUND)
+  set(STATUS_LAXJSON "OK")
+else()
+  set(STATUS_LAXJSON "not found")
+endif()
+
 configure_file (
   "${PROJECT_SOURCE_DIR}/src/config.h.in"
   "${PROJECT_BINARY_DIR}/config.h"
@@ -37,8 +45,8 @@ file(GLOB_RECURSE HEADERS ${PROJECT_SOURCE_DIR}/src/*.h)
 set(EXE_CFLAGS "${C99_C_FLAGS} -pedantic -Werror -Wall -Werror=strict-prototypes -Werror=old-style-definition -Werror=missing-prototypes")
 
 add_executable(rucksack ${SOURCES} ${HEADERS})
-target_link_libraries(rucksack ${FreeImage_LIBRARIES})
-include_directories(${FreeImage_INCLUDE_DIRS})
+target_link_libraries(rucksack ${FreeImage_LIBRARIES} ${LAXJSON_LIBRARIES})
+include_directories(${FreeImage_INCLUDE_DIRS} ${LAXJSON_INCLUDE_DIRS})
 set_target_properties(rucksack PROPERTIES
   COMPILE_FLAGS ${EXE_CFLAGS})
 
@@ -56,6 +64,7 @@ message(
 "------------------\n"
 "* C99 Compiler                 : ${STATUS_C99}\n"
 "* freeimage                    : ${STATUS_FREEIMG}\n"
+"* laxjson                      : ${STATUS_LAXJSON}\n"
 )
 
 message(

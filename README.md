@@ -31,6 +31,12 @@ Parses assets.json and assembles textures and texture maps.
 
 ```js
 {
+  files: {
+    file1Name: {
+      path: "path/to/file",
+      compression: null,
+    },
+  },
   textures: {
     texture1Name: {
       maxWidth: 1024,
@@ -53,3 +59,24 @@ Parses assets.json and assembles textures and texture maps.
   },
 }
 ```
+
+## RuckSack Bundle File Format
+
+  Offset | Contents
+  -------+---------
+       0 | 16 byte UUID - 60 70 c8 99 82 a1 41 84 89 51 08 c9 1c c9 b6 20
+      16 | uint32be offset of first header entry from file start
+      20 | uint32be offset of last header entry from file start
+      24 | uint32be header entry size in bytes
+      28 | uint32be MaxKeySize - number of bytes allocated for keys
+
+### Header Entry Format
+
+           Offset | Contents
+  ----------------+---------
+                0 | uint32be key size in bytes
+                4 | key bytes
+   MaxKeySize + 4 | uint64be offset of this entry's file contents
+  MaxKeySize + 12 | uint64be actual size of this file's contents in bytes
+  MaxKeySize + 20 | uint64be number of allocated bytes for this file
+

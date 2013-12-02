@@ -70,7 +70,6 @@ rest of the header entries.
          0 | 16 byte UUID - 60 70 c8 99 82 a1 41 84 89 51 08 c9 1c c9 b6 20
         16 | uint32be offset of first header entry from file start
         20 | uint32be number of header entries
-        24 | uint32be number of allocated bytes for all header entries
 
 ### Header Entry Format
 

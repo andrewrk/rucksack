@@ -61,7 +61,7 @@ void rucksack_init(void);
 void rucksack_finish(void);
 
 int rucksack_bundle_open(const char *bundle_path, struct RuckSackBundle **bundle);
-void rucksack_bundle_close(struct RuckSackBundle *bundle);
+int rucksack_bundle_close(struct RuckSackBundle *bundle);
 
 struct RuckSackPage *rucksack_page_create(void);
 void rucksack_page_destroy(struct RuckSackPage *page);

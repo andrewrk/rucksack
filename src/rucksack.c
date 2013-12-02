@@ -1119,6 +1119,7 @@ int rucksack_bundle_add_stream(struct RuckSackBundle *bundle,
         return err;
     }
     stream->e->is_open = 1;
+    stream->e->size = 0;
 
     *out_stream = stream;
     return RuckSackErrorNone;

@@ -39,19 +39,54 @@ configure_file (
   "${PROJECT_BINARY_DIR}/config.h"
   )
 
-file(GLOB_RECURSE SOURCES ${PROJECT_SOURCE_DIR}/src/*.c)
-file(GLOB_RECURSE HEADERS ${PROJECT_SOURCE_DIR}/src/*.h)
+set(LIB_SOURCES
+  ${PROJECT_SOURCE_DIR}/src/rucksack.c
+  )
+set(LIB_HEADERS
+  ${PROJECT_SOURCE_DIR}/src/rucksack.h
+  )
+set(EXE_SOURCES
+  ${PROJECT_SOURCE_DIR}/src/main.c
+  )
+set(EXE_HEADERS
+  ${PROJECT_SOURCE_DIR}/src/rucksack.h
+  )
 
-set(EXE_CFLAGS "${C99_C_FLAGS} -pedantic -Werror -Wall -Werror=strict-prototypes -Werror=old-style-definition -Werror=missing-prototypes -D_POSIX_C_SOURCE=200809L")
+set(LIB_CFLAGS "${C99_C_FLAGS} -pedantic -Werror -Wall -Werror=strict-prototypes -Werror=old-style-definition -Werror=missing-prototypes -D_POSIX_C_SOURCE=200809L")
+set(EXE_CFLAGS ${LIB_CFLAGS})
 
-add_executable(rucksack ${SOURCES} ${HEADERS})
-target_link_libraries(rucksack ${FreeImage_LIBRARIES} ${LAXJSON_LIBRARIES})
-include_directories(${FreeImage_INCLUDE_DIRS} ${LAXJSON_INCLUDE_DIRS})
+include_directories(${FreeImage_INCLUDE_DIRS})
+add_library(rucksack_static STATIC ${LIB_SOURCES} ${LIB_HEADERS})
+set_target_properties(rucksack_static PROPERTIES
+  OUTPUT_NAME rucksack
+  COMPILE_FLAGS ${LIB_CFLAGS})
+
+add_library(rucksack_shared SHARED ${LIB_SOURCES} ${LIB_HEADERS})
+set_target_properties(rucksack_shared PROPERTIES
+  OUTPUT_NAME rucksack
+  SOVERSION ${VERSION_MAJOR}
+  VERSION ${VERSION}
+  COMPILE_FLAGS ${LIB_CFLAGS})
+target_link_libraries(rucksack_shared ${FreeImage_LIBRARIES})
+
+add_executable(rucksack ${EXE_SOURCES} ${EXE_HEADERS})
+target_link_libraries(rucksack rucksack_shared ${LAXJSON_LIBRARIES})
+include_directories(${LAXJSON_INCLUDE_DIRS})
 set_target_properties(rucksack PROPERTIES
   COMPILE_FLAGS ${EXE_CFLAGS})
 
+install(TARGETS rucksack DESTINATION bin)
+install(TARGETS rucksack_static rucksack_shared DESTINATION lib)
+install(FILES "src/rucksack.h" DESTINATION include)
 
-install(TARGETS rucksack DESTINATION lib)
+
+enable_testing()
+include_directories("${PROJECT_SOURCE_DIR}/src")
+add_executable(all_tests test/all_tests.c)
+set_target_properties(all_tests PROPERTIES
+  COMPILE_FLAGS ${EXE_CFLAGS})
+target_link_libraries(all_tests rucksack_shared)
+add_test(AllTests all_tests)
 
 message("\n"
 "Installation Summary\n"

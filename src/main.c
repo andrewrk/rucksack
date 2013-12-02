@@ -86,6 +86,8 @@ static char *image_key = NULL;
 
 static char *path_prefix = ".";
 
+static char debug_mode = 0;
+
 static const char *ERR_STR[] = {
     "",
     "unexpected char",
@@ -146,7 +148,8 @@ static char *resolve_path(const char *path) {
 static int on_string(struct LaxJsonContext *json, enum LaxJsonType type,
         const char *value, int length)
 {
-    fprintf(stderr, "state: %s, %s: %s\n", STATE_STR[state], JSON_TYPE_STR[type], value);
+    if (debug_mode)
+        fprintf(stderr, "state: %s, %s: %s\n", STATE_STR[state], JSON_TYPE_STR[type], value);
     switch (state) {
         case StateStart:
             return parse_error("top-level value must be an object, not string"); 
@@ -269,7 +272,8 @@ static int on_string(struct LaxJsonContext *json, enum LaxJsonType type,
 }
 
 static int on_number(struct LaxJsonContext *json, double x) {
-    fprintf(stderr, "state: %s, number: %f\n", STATE_STR[state], x);
+    if (debug_mode)
+        fprintf(stderr, "state: %s, number: %f\n", STATE_STR[state], x);
     switch (state) {
         case StateStart:
             return parse_error("top-level value must be an object, not number"); 
@@ -313,7 +317,8 @@ static int on_number(struct LaxJsonContext *json, double x) {
 }
 
 static int on_primitive(struct LaxJsonContext *json, enum LaxJsonType type) {
-    fprintf(stderr, "state: %s, primitive: %s\n", STATE_STR[state], JSON_TYPE_STR[type]);
+    if (debug_mode)
+        fprintf(stderr, "state: %s, primitive: %s\n", STATE_STR[state], JSON_TYPE_STR[type]);
     switch (state) {
         case StateStart:
             return parse_error("top-level value must be an object, not primitive"); 
@@ -347,7 +352,8 @@ static int on_primitive(struct LaxJsonContext *json, enum LaxJsonType type) {
 }
 
 static int on_begin(struct LaxJsonContext *json, enum LaxJsonType type) {
-    fprintf(stderr, "state: %s, begin %s\n", STATE_STR[state], JSON_TYPE_STR[type]);
+    if (debug_mode)
+        fprintf(stderr, "state: %s, begin %s\n", STATE_STR[state], JSON_TYPE_STR[type]);
     switch (state) {
         case StateStart:
             if (type == LaxJsonTypeArray)
@@ -412,7 +418,8 @@ static int on_begin(struct LaxJsonContext *json, enum LaxJsonType type) {
 }
 
 static int on_end(struct LaxJsonContext *json, enum LaxJsonType type) {
-    fprintf(stderr, "state: %s, end %s\n", STATE_STR[state], JSON_TYPE_STR[type]);
+    if (debug_mode)
+        fprintf(stderr, "state: %s, end %s\n", STATE_STR[state], JSON_TYPE_STR[type]);
     switch (state) {
         case StateStart:
             return parse_error("expected an object, got nothing");

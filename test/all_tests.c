@@ -145,6 +145,20 @@ static void test_bundling_twice(void) {
     ok(rucksack_bundle_close(bundle));
 }
 
+static void test_three_files(void) {
+    const char *bundle_name = "test.bundle";
+    remove(bundle_name);
+
+    struct RuckSackBundle *bundle;
+    ok(rucksack_bundle_open(bundle_name, &bundle));
+
+    ok(rucksack_bundle_add_file(bundle, "blah", "../test/blah.txt"));
+    ok(rucksack_bundle_add_file(bundle, "g_globby1.txt", "../test/globby1.txt"));
+    ok(rucksack_bundle_add_file(bundle, "g_globby2.txt", "../test/globby2.txt"));
+
+    ok(rucksack_bundle_close(bundle));
+}
+
 struct Test {
     const char *name;
     void (*fn)(void);
@@ -155,6 +169,7 @@ static struct Test tests[] = {
     {"writing and reading", test_write_read},
     {"texture packing", test_texture_packing},
     {"bundling twice", test_bundling_twice},
+    {"add 3 files", test_three_files},
     {NULL, NULL},
 };
 

@@ -204,7 +204,6 @@ static int glob_insert_files(void) {
             snprintf(strbuf, sizeof(strbuf), "unable to add %s: %s", path, RS_ERROR_STR[err]);
             return parse_error(strbuf);
         }
-        fprintf(stderr, "added %s\n", path);
     }
 
     globfree(&glob_result);

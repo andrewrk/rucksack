@@ -104,6 +104,47 @@ static void test_texture_packing(void) {
     ok(rucksack_bundle_close(bundle));
 }
 
+static void test_bundling_twice(void) {
+    const char *bundle_name = "test.bundle";
+    remove(bundle_name);
+
+    for (int i = 0; i < 2; i += 1) {
+        struct RuckSackBundle *bundle;
+        ok(rucksack_bundle_open(bundle_name, &bundle));
+
+        struct RuckSackPage *page = rucksack_page_create();
+        assert(page);
+
+        struct RuckSackImage img;
+        img.anchor = RuckSackAnchorCenter;
+
+        img.path = "../test/radar-circle.png";
+        ok(rucksack_page_add_image(page, "radarCircle", &img));
+
+        img.path = "../test/arrow.png";
+        ok(rucksack_page_add_image(page, "arrow", &img));
+
+        ok(rucksack_bundle_add_page(bundle, "cockpit", page));
+
+        rucksack_page_destroy(page);
+
+        ok(rucksack_bundle_close(bundle));
+    }
+
+    struct RuckSackBundle *bundle;
+    ok(rucksack_bundle_open(bundle_name, &bundle));
+
+    struct RuckSackFileEntry *entry = rucksack_bundle_find_file(bundle, "cockpit");
+    assert(entry);
+
+    size_t size = rucksack_file_size(entry);
+    unsigned char *buffer = malloc(size);
+    ok(rucksack_bundle_file_read(bundle, entry, buffer));
+    free(buffer);
+
+    ok(rucksack_bundle_close(bundle));
+}
+
 struct Test {
     const char *name;
     void (*fn)(void);
@@ -113,6 +154,7 @@ static struct Test tests[] = {
     {"opening and closing", test_open_close},
     {"writing and reading", test_write_read},
     {"texture packing", test_texture_packing},
+    {"bundling twice", test_bundling_twice},
     {NULL, NULL},
 };
 

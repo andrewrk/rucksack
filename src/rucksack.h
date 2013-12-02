@@ -90,7 +90,6 @@ int rucksack_bundle_add_file(struct RuckSackBundle *bundle, const char *key,
 
 int rucksack_bundle_add_stream(struct RuckSackBundle *bundle, const char *key,
         size_t size_guess, struct RuckSackOutStream **stream);
-int rucksack_bundle_del(struct RuckSackBundle *bundle, const char *key);
 
 int rucksack_page_add_image(struct RuckSackPage *page, const char *key,
         struct RuckSackImage *image);
@@ -105,11 +104,6 @@ size_t rucksack_file_size(struct RuckSackFileEntry *entry);
 const char *rucksack_file_name(struct RuckSackFileEntry *entry);
 int rucksack_bundle_file_read(struct RuckSackBundle *bundle,
         struct RuckSackFileEntry *entry, unsigned char *buffer);
-
-void rucksack_bundle_get_page(struct RuckSackBundle *bundle, const char *key,
-        struct RuckSackPage *page);
-void rucksack_page_get_image(struct RuckSackPage *page, const char *key,
-        struct RuckSackImage *image);
 
 int rucksack_stream_write(struct RuckSackOutStream *stream, const void *ptr,
         size_t count);

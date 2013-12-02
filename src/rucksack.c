@@ -1173,7 +1173,8 @@ int rucksack_bundle_file_read(struct RuckSackBundle *bundle, struct RuckSackFile
     struct RuckSackBundlePrivate *b = (struct RuckSackBundlePrivate *) bundle;
     if (fseek(b->f, e->offset, SEEK_SET))
         return RuckSackErrorFileAccess;
-    if (fread(buffer, 1, e->size, b->f) != e->size)
+    size_t amt_read = fread(buffer, 1, e->size, b->f);
+    if (amt_read != e->size)
         return RuckSackErrorFileAccess;
     return RuckSackErrorNone;
 }

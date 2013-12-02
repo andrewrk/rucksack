@@ -479,8 +479,8 @@ static void print_rs_error(int err) {
     fprintf(stderr, "Error: %s\n", RS_ERROR_STR[err]);
 }
 
-static int usage(char *arg0) {
-    fprintf(stderr, "Usage: %s assetsfile bundlefile\n"
+static int bundle_usage(char *arg0) {
+    fprintf(stderr, "Usage: %s bundle assetsfile bundlefile\n"
             "\n"
             "Options:\n"
             "  [--prefix path]  assets are loaded relative to this path. defaults to cwd\n"
@@ -488,32 +488,38 @@ static int usage(char *arg0) {
     return 1;
 }
 
-int main(int argc, char *argv[]) {
+static int extract_usage(char *arg0) {
+    fprintf(stderr, "Usage: %s extract bundlefile resourcename\n"
+            , arg0);
+    return 1;
+}
+
+static int command_bundle(char *arg0, int argc, char *argv[]) {
     char *input_filename = NULL;
     char *bundle_filename = NULL;
 
-    for (int i = 1; i < argc; i += 1) {
+    for (int i = 0; i < argc; i += 1) {
         char *arg = argv[i];
         if (arg[0] == '-' && arg[1] == '-') {
             arg += 2;
             if (i + 1 >= argc) {
-                return usage(argv[0]);
+                return bundle_usage(arg0);
             } else if (strcmp(arg, "prefix") == 0) {
                 path_prefix = argv[++i];
             } else {
-                return usage(argv[0]);
+                return bundle_usage(arg0);
             }
         } else if (!input_filename) {
             input_filename = arg;
         } else if (!bundle_filename) {
             bundle_filename = arg;
         } else {
-            return usage(argv[0]);
+            return bundle_usage(arg0);
         }
     }
 
     if (!input_filename)
-        return usage(argv[0]);
+        return bundle_usage(arg0);
 
 
     FILE *in_f;
@@ -563,7 +569,154 @@ int main(int argc, char *argv[]) {
     if (parse_err_occurred)
         return 1;
 
-    rucksack_bundle_close(bundle);
+    rs_err = rucksack_bundle_close(bundle);
+    if (rs_err) {
+        print_rs_error(rs_err);
+        return 1;
+    }
 
     return 0;
+}
+
+static int command_extract(char *arg0, int argc, char *argv[]) {
+    char *bundle_filename = NULL;
+    char *resource_name = NULL;
+
+    for (int i = 0; i < argc; i += 1) {
+        char *arg = argv[i];
+        if (arg[0] == '-' && arg[1] == '-') {
+            return extract_usage(arg0);
+        } else if (!bundle_filename) {
+            bundle_filename = arg;
+        } else if (!resource_name) {
+            resource_name = arg;
+        } else {
+            return extract_usage(arg0);
+        }
+    }
+
+    if (!bundle_filename)
+        return extract_usage(arg0);
+
+    if (!resource_name)
+        return extract_usage(arg0);
+
+    rucksack_init();
+    atexit(rucksack_finish);
+
+    int rs_err = rucksack_bundle_open(bundle_filename, &bundle);
+    if (rs_err) {
+        print_rs_error(rs_err);
+        return 1;
+    }
+
+    struct RuckSackFileEntry *entry = rucksack_bundle_find_file(bundle, resource_name);
+    if (!entry) {
+        fprintf(stderr, "entry not found\n");
+        return 1;
+    }
+    size_t size = rucksack_file_size(entry);
+    unsigned char *buffer = malloc(size);
+
+    rs_err = rucksack_bundle_file_read(bundle, entry, buffer);
+
+    if (rs_err) {
+        print_rs_error(rs_err);
+        return 1;
+    }
+
+    if (fwrite(buffer, 1, size, stdout) != size) {
+        fprintf(stderr, "error writing to stdout\n");
+        return 1;
+    }
+
+    free(buffer);
+
+    rs_err = rucksack_bundle_close(bundle);
+    if (rs_err) {
+        print_rs_error(rs_err);
+        return 1;
+    }
+
+    return 0;
+}
+
+static int help_usage(char *arg0) {
+    fprintf(stderr, "Usage: %s help command\n"
+            , arg0);
+    return 1;
+}
+
+struct Command {
+    const char *name;
+    int (*exec)(char *arg0, int agc, char *argv[]);
+    int (*usage)(char *arg0);
+    const char *desc;
+};
+
+static int command_help(char *arg0, int argc, char *argv[]);
+static struct Command commands[] = {
+    {"bundle", command_bundle, bundle_usage,
+        "parses an assets json file and keeps a bundle up to date"},
+    {"extract", command_extract, extract_usage,
+        "extracts a single file from the bundle and writes it to stdout"},
+    {"help", command_help, help_usage,
+        "get info on how to use a command"},
+    {NULL, NULL, NULL},
+};
+
+static int usage(char *arg0) {
+    int major, minor, patch;
+    rucksack_version(&major, &minor, &patch);
+    fprintf(stderr, 
+            "rucksack v%d.%d.%d\n"
+            "\n"
+            "Usage: %s [command] [command-options]\n"
+            "\n"
+            "Commands:\n"
+            , major, minor, patch, arg0);
+
+    struct Command *cmd = &commands[0];
+
+    while (cmd->name) {
+        fprintf(stderr, "  %-10s %s\n", cmd->name, cmd->desc);
+        cmd += 1;
+    }
+    return 1;
+}
+
+
+static int command_help(char *arg0, int argc, char *argv[]) {
+    if (argc != 1) return help_usage(arg0);
+
+    char *cmd_name = argv[0];
+
+    struct Command *cmd = &commands[0];
+
+    while (cmd->name) {
+        if (strcmp(cmd_name, cmd->name) == 0) {
+            cmd->usage(arg0);
+            return 0;
+        }
+        cmd += 1;
+    }
+
+    fprintf(stderr, "unrecognized command: %s\n", cmd_name);
+    return 1;
+}
+
+int main(int argc, char *argv[]) {
+    if (argc < 2) return usage(argv[0]);
+
+    char *cmd_name = argv[1];
+
+    struct Command *cmd = &commands[0];
+
+    while (cmd->name) {
+        if (strcmp(cmd_name, cmd->name) == 0)
+            return cmd->exec(argv[0], argc - 2, argv + 2);
+        cmd += 1;
+    }
+
+    return usage(argv[0]);
 }

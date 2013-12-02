@@ -6,6 +6,7 @@
  */
 
 #include "rucksack.h"
+#include "config.h"
 
 #include <FreeImage.h>
 #include <stdlib.h>
@@ -1171,4 +1172,10 @@ int rucksack_bundle_file_read(struct RuckSackBundle *bundle, struct RuckSackFile
     if (fread(buffer, 1, e->size, b->f) != e->size)
         return RuckSackErrorFileAccess;
     return RuckSackErrorNone;
+}
+
+void rucksack_version(int *major, int *minor, int *patch) {
+    if (major) *major = RUCKSACK_VERSION_MAJOR;
+    if (minor) *minor = RUCKSACK_VERSION_MINOR;
+    if (patch) *patch = RUCKSACK_VERSION_PATCH;
 }

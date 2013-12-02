@@ -75,6 +75,8 @@ struct RuckSackOutStream;
 void rucksack_init(void);
 void rucksack_finish(void);
 
+void rucksack_version(int *major, int *minor, int *patch);
+
 int rucksack_bundle_open(const char *bundle_path, struct RuckSackBundle **bundle);
 int rucksack_bundle_close(struct RuckSackBundle *bundle);
 

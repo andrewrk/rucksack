@@ -1,18 +1,42 @@
 # rucksack
 
-(work in progress) Open-source texture packer.
+Texture packer and resource bundler. Use the rucksack executable to build your
+resources file, and then depend on librucksack in-game to get the resources out
+at runtime. (or roll your own resource-loading code using the very simple file
+format, detailed at the end of this readme.)
 
-## Usage
+## Command Line Usage
 
 ```
-rucksack assets.json
+rucksack assetsfile bundlefile
 
 Options:
-  --dir outputdir        defaults to current directory
-  --format json          'json' or 'plain'
+  --prefix path        assets are loaded relative to this path. defaults to cwd
 ```
 
-Parses assets.json and assembles textures and texture maps.
+Parses assetsfile and performs these functions:
+
+ * packs multiple images into textures and creates texture atlases for them
+ * saves files into the bundle for later extraction
+
+## Library Usage
+
+```C
+#include <rucksack.h>
+
+int main() {
+    struct RuckSackBundle *bundle;
+    rucksack_bundle_open(bundle_name, &bundle);
+
+    struct RuckSackFileEntry *entry = rucksack_bundle_find_file(bundle, "blah");
+    size_t size = rucksack_file_size(entry);
+    unsigned char *buffer = malloc(size);
+    rucksack_bundle_file_read(bundle, entry, buf);
+    // buffer now contains the contents of the file indexed by "blah"
+    free(buffer);
+    rucksack_bundle_close(bundle);
+}
+```
 
 ## Dependencies
 

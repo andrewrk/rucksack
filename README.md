@@ -55,12 +55,20 @@ int main() {
 
 ```js
 {
+  // one-off files you want to directly save into the bundle
   files: {
     file1Name: {
       path: "path/to/file",
-      compression: null,
     },
   },
+  // if you want to avoid manually specifying every file, you can glob
+  globFiles: [
+    {
+      glob: "path/to/*",
+      prefix: "abc_", // prepended to the key
+    },
+  ],
+  // spritesheet generation
   textures: {
     texture1Name: {
       maxWidth: 1024,

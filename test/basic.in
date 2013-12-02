@@ -1,15 +1,26 @@
 // comments are OK :)
 // single quotes, double quotes, and no quotes are OK
 {
+  files: {
+    blah: {
+      path: "blah.txt",
+    },
+  },
+  globFiles: [
+    {
+      glob: "globby*",
+      prefix: "g_",
+    },
+  ],
   textures: {
     cockpit: {
       images: {
         arrow: {
-          path: "img/arrow.png",
+          path: "arrow.png",
           anchor: "left",
         },
         radarCircle: {
-          path: "img/radar-circle.png",
+          path: "radar-circle.png",
           anchor: "center"
         },
       },

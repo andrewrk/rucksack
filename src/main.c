@@ -8,6 +8,10 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <assert.h>
+#include <glob.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 #include <laxjson.h>
 
@@ -42,6 +46,11 @@ enum State {
     StateFileObjectBegin,
     StateFilePropName,
     StateFilePropPath,
+    StateExpectGlobArray,
+    StateGlobObject,
+    StateGlobObjectProp,
+    StateGlobValueGlob,
+    StateGlobValuePrefix,
 };
 
 static const char *STATE_STR[] = {
@@ -69,11 +78,16 @@ static const char *STATE_STR[] = {
     "StateFileObjectBegin",
     "StateFilePropName",
     "StateFilePropPath",
+    "StateExpectGlobArray",
+    "StateGlobObject",
+    "StateGlobObjectProp",
+    "StateGlobValueGlob",
+    "StateGlobValuePrefix",
 };
 
 static enum State state;
 static char parse_err_occurred = 0;
-static char strbuf[500];
+static char strbuf[1024];
 
 static struct RuckSackPage *page = NULL;
 static char *page_key = NULL;
@@ -86,7 +100,10 @@ static char *image_key = NULL;
 
 static char *path_prefix = ".";
 
-static char debug_mode = 0;
+static char *glob_glob = NULL;
+static char *glob_prefix = NULL;
+
+static char debug_mode = 1;
 
 static const char *ERR_STR[] = {
     "",
@@ -139,10 +156,60 @@ static char *resolve_path(const char *path) {
         // absolute path - don't do anything to it
         return strdup(path);
     } else {
-        char *out = malloc(512);
-        snprintf(out, 512, "%s/%s", path_prefix, path);
+        char *out = malloc(1024);
+        snprintf(out, 1024, "%s/%s", path_prefix, path);
         return out;
     }
+}
+
+static int glob_insert_files(void) {
+    glob_t glob_result;
+    int err = glob(glob_glob, GLOB_NOSORT, NULL, &glob_result);
+
+    switch (err) {
+        case GLOB_NOSPACE:
+            return parse_error("out of memory");
+        case GLOB_ABORTED:
+            return parse_error("read error while globbing");
+        case GLOB_NOMATCH:
+            return parse_error("no patterns matched");
+    }
+
+    for (unsigned int i = 0; i < glob_result.gl_pathc; i += 1) {
+        struct stat s;
+        char *path = glob_result.gl_pathv[i];
+        if (stat(path, &s) != 0) {
+            snprintf(strbuf, sizeof(strbuf), "unable to stat %s", path);
+            return parse_error(strbuf);
+        }
+
+        if (S_ISDIR(s.st_mode))
+            continue;
+
+        // compute a relative path so we can use it to build the key
+        char *relative_path = path;
+        int path_prefix_size = strlen(path_prefix);
+        if (strlen(relative_path) > path_prefix_size &&
+            memcmp(relative_path, path_prefix, path_prefix_size) == 0)
+        {
+            relative_path += path_prefix_size;
+            while (relative_path[0] == '/') {
+                relative_path += 1;
+            }
+        }
+
+        snprintf(strbuf, sizeof(strbuf), "%s%s", glob_prefix, relative_path);
+        err = rucksack_bundle_add_file(bundle, strbuf, path);
+        if (err) {
+            snprintf(strbuf, sizeof(strbuf), "unable to add %s: %s", path, RS_ERROR_STR[err]);
+            return parse_error(strbuf);
+        }
+        fprintf(stderr, "added %s\n", path);
+    }
+
+    globfree(&glob_result);
+
+    return 0;
 }
 
 static int on_string(struct LaxJsonContext *json, enum LaxJsonType type,
@@ -160,6 +227,8 @@ static int on_string(struct LaxJsonContext *json, enum LaxJsonType type,
                 state = StateTextures;
             } else if (strcmp(value, "files") == 0) {
                 state = StateExpectFilesObject;
+            } else if (strcmp(value, "globFiles") == 0) {
+                state = StateExpectGlobArray;
             } else {
                 snprintf(strbuf, sizeof(strbuf), "unknown top level property: %s", value);
                 return parse_error(strbuf);
@@ -264,6 +333,24 @@ static int on_string(struct LaxJsonContext *json, enum LaxJsonType type,
                 return parse_error(strbuf);
             }
             break;
+        case StateGlobObjectProp:
+            if (strcmp(value, "glob") == 0) {
+                state = StateGlobValueGlob;
+            } else if (strcmp(value, "prefix") == 0) {
+                state = StateGlobValuePrefix;
+            } else {
+                snprintf(strbuf, sizeof(strbuf), "unknown glob property: %s", value);
+                return parse_error(strbuf);
+            }
+            break;
+        case StateGlobValueGlob:
+            glob_glob = resolve_path(value);
+            state = StateGlobObjectProp;
+            break;
+        case StateGlobValuePrefix:
+            glob_prefix = strdup(value);
+            state = StateGlobObjectProp;
+            break;
         default:
             return parse_error("unexpected string");
     }
@@ -320,27 +407,16 @@ static int on_primitive(struct LaxJsonContext *json, enum LaxJsonType type) {
     if (debug_mode)
         fprintf(stderr, "state: %s, primitive: %s\n", STATE_STR[state], JSON_TYPE_STR[type]);
     switch (state) {
-        case StateStart:
-            return parse_error("top-level value must be an object, not primitive"); 
-        case StateDone:
-            return parse_error("unexpected content after EOF");
-        case StateTextures:
-            return parse_error("expected textures to be an object, not primitive");
-        case StateExpectImagesObject:
-            return parse_error("expected image object, not primitive");
-        case StateImageObjectBegin:
-            return parse_error("expected image properties object, not primitive");
-        case StateImagePropAnchor:
-            return parse_error("expected object or string, not primitive");
-        case StateImagePropPath:
-            return parse_error("expected string, not primitive");
         case StateTexturePow2:
-            if (type == LaxJsonTypeTrue) {
-                page->pow2 = 1;
-            } else if (type == LaxJsonTypeFalse) {
-                page->pow2 = 0;
-            } else {
-                return parse_error("expected true or false");
+            switch (type) {
+                case LaxJsonTypeTrue:
+                    page->pow2 = 1;
+                    break;
+                case LaxJsonTypeFalse:
+                    page->pow2 = 0;
+                    break;
+                default:
+                    return parse_error("expected true or false");
             }
             state = StateTextureProp;
             break;
@@ -354,64 +430,51 @@ static int on_primitive(struct LaxJsonContext *json, enum LaxJsonType type) {
 static int on_begin(struct LaxJsonContext *json, enum LaxJsonType type) {
     if (debug_mode)
         fprintf(stderr, "state: %s, begin %s\n", STATE_STR[state], JSON_TYPE_STR[type]);
-    switch (state) {
-        case StateStart:
-            if (type == LaxJsonTypeArray)
-                return parse_error("top-level value must be an object, not array"); 
-            state = StateTopLevelProp;
-            break;
-        case StateTopLevelProp:
-            return parse_error("expected property name");
-        case StateDone:
-            return parse_error("unexpected content after EOF");
-        case StateTextures:
-            if (type == LaxJsonTypeArray) {
-                return parse_error("expected textures to be an object, not array");
-            }
-            state = StateTextureName;
-            break;
-        case StateExpectImagesObject:
-            if (type == LaxJsonTypeArray) {
-                return parse_error("expected image object, not array");
-            }
-            state = StateImageName;
-            break;
-        case StateExpectTextureObject:
-            if (type == LaxJsonTypeArray)
-                return parse_error("expected texture object, not array");
-            state = StateTextureProp;
-            break;
-        case StateImageObjectBegin:
-            if (type == LaxJsonTypeArray) {
-                return parse_error("expected image properties object, not array");
-            }
-            state = StateImagePropName;
-            break;
-        case StateFileObjectBegin:
-            if (type == LaxJsonTypeArray) {
-                return parse_error("expected file object, not array");
-            }
-            state = StateFilePropName;
-            break;
-        case StateImagePropAnchor:
-            if (type == LaxJsonTypeArray) {
-                return parse_error("expected object or string, not array");
-            }
-            state = StateImagePropAnchorObject;
-            image.anchor = RuckSackAnchorExplicit;
-            break;
-        case StateImagePropAnchorX:
-        case StateImagePropAnchorY:
-            return parse_error("expected number");
-        case StateImagePropPath:
-            return parse_error("expected string");
-        case StateExpectFilesObject:
-            if (type == LaxJsonTypeArray)
-                return parse_error("expected files object, not array");
-            state = StateFileName;
-            break;
-        default:
-            return parse_error("unexpected array or object");
+    if (type == LaxJsonTypeArray) {
+        switch (state) {
+            case StateExpectGlobArray:
+                state = StateGlobObject;
+                break;
+            default:
+                return parse_error("unexpected array");
+        }
+    } else {
+        assert(type == LaxJsonTypeObject);
+
+        switch (state) {
+            case StateStart:
+                state = StateTopLevelProp;
+                break;
+            case StateTextures:
+                state = StateTextureName;
+                break;
+            case StateExpectImagesObject:
+                state = StateImageName;
+                break;
+            case StateExpectTextureObject:
+                state = StateTextureProp;
+                break;
+            case StateImageObjectBegin:
+                state = StateImagePropName;
+                break;
+            case StateFileObjectBegin:
+                state = StateFilePropName;
+                break;
+            case StateImagePropAnchor:
+                state = StateImagePropAnchorObject;
+                image.anchor = RuckSackAnchorExplicit;
+                break;
+            case StateExpectFilesObject:
+                state = StateFileName;
+                break;
+            case StateGlobObject:
+                state = StateGlobObjectProp;
+                glob_glob = NULL;
+                glob_prefix = NULL;
+                break;
+            default:
+                return parse_error("unexpected object");
+        }
     }
 
     return 0;
@@ -420,6 +483,7 @@ static int on_begin(struct LaxJsonContext *json, enum LaxJsonType type) {
 static int on_end(struct LaxJsonContext *json, enum LaxJsonType type) {
     if (debug_mode)
         fprintf(stderr, "state: %s, end %s\n", STATE_STR[state], JSON_TYPE_STR[type]);
+    int err;
     switch (state) {
         case StateStart:
             return parse_error("expected an object, got nothing");
@@ -440,7 +504,11 @@ static int on_end(struct LaxJsonContext *json, enum LaxJsonType type) {
             state = StateImageName;
             break;
         case StateFilePropName:
-            rucksack_bundle_add_file(bundle, file_key, file_path);
+            err = rucksack_bundle_add_file(bundle, file_key, file_path);
+            if (err) {
+                snprintf(strbuf, sizeof(strbuf), "unable to add file: %s", RS_ERROR_STR[err]);
+                return parse_error(strbuf);
+            }
 
             free(file_path);
             file_path = NULL;
@@ -452,14 +520,16 @@ static int on_end(struct LaxJsonContext *json, enum LaxJsonType type) {
         case StateImagePropAnchorObject:
             state = StateImagePropName;
             break;
-        case StateTextureName:
-            state = StateTopLevelProp;
-            break;
         case StateImageName:
             state = StateTextureProp;
             break;
         case StateTextureProp:
-            rucksack_bundle_add_page(bundle, page_key, page);
+            err = rucksack_bundle_add_page(bundle, page_key, page);
+            if (err) {
+                snprintf(strbuf, sizeof(strbuf), "unable to add page: %s", RS_ERROR_STR[err]);
+                return parse_error(strbuf);
+            }
+
             rucksack_page_destroy(page);
             page = NULL;
 
@@ -467,6 +537,18 @@ static int on_end(struct LaxJsonContext *json, enum LaxJsonType type) {
             page_key = NULL;
 
             state = StateTextureName;
+            break;
+        case StateGlobObjectProp:
+            err = glob_insert_files();
+            if (err) return err;
+            free(glob_glob);
+            free(glob_prefix);
+            state = StateGlobObject;
+            break;
+        case StateTextureName:
+        case StateGlobObject:
+        case StateFileName:
+            state = StateTopLevelProp;
             break;
         default:
             return parse_error("unexpected end of object or array");
@@ -517,6 +599,8 @@ static int command_bundle(char *arg0, int argc, char *argv[]) {
     if (!input_filename)
         return bundle_usage(arg0);
 
+    if (!bundle_filename)
+        return bundle_usage(arg0);
 
     FILE *in_f;
     if (strcmp(input_filename, "-") == 0) {

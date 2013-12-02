@@ -104,6 +104,17 @@ static const char *JSON_TYPE_STR[] = {
     "Null",
 };
 
+static const char *RS_ERROR_STR[] = {
+    "",
+    "out of memory",
+    "problem accessing file",
+    "invalid bundle format",
+    "invalid anchor enum value",
+    "cannot fit all images into page",
+    "image has no pixels",
+    "unrecognized image format",
+};
+
 static int parse_error(const char *msg) {
     if (parse_err_occurred)
         return -1;
@@ -449,6 +460,10 @@ static int on_end(struct LaxJsonContext *json, enum LaxJsonType type) {
     return 0;
 }
 
+static void print_rs_error(int err) {
+    fprintf(stderr, "Error: %s\n", RS_ERROR_STR[err]);
+}
+
 static int usage(char *arg0) {
     fprintf(stderr, "Usage: %s assetsfile bundlefile\n"
             "\n"
@@ -500,7 +515,11 @@ int main(int argc, char *argv[]) {
     rucksack_init();
     atexit(rucksack_finish);
 
-    bundle = rucksack_bundle_open(bundle_filename);
+    int rs_err = rucksack_bundle_open(bundle_filename, &bundle);
+    if (rs_err) {
+        print_rs_error(rs_err);
+        return 1;
+    }
 
     json = lax_json_create();
     json->string = on_string;

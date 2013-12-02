@@ -1,8 +1,8 @@
 #include "rucksack.h"
 
 #include <FreeImage.h>
-#include <assert.h>
 #include <stdlib.h>
+#include <assert.h>
 #include <stdio.h>
 #include <string.h>
 #include <limits.h>
@@ -277,16 +277,20 @@ static void init_new_bundle(struct RuckSackBundlePrivate *b) {
     b->first_header_offset = 28;
 }
 
-struct RuckSackBundle *rucksack_bundle_open(const char *bundle_path) {
+int rucksack_bundle_open(const char *bundle_path, struct RuckSackBundle **out_bundle) {
     struct RuckSackBundlePrivate *b = calloc(1, sizeof(struct RuckSackBundlePrivate));
-    if (!b) return NULL;
+    if (!b) {
+        *out_bundle = NULL;
+        return RuckSackErrorNoMem;
+    }
 
     b->f = fopen(bundle_path, "rb+");
     if (b->f) {
         int err = read_header(b);
         if (err) {
             free(b);
-            return NULL;
+            *out_bundle = NULL;
+            return err;
         }
     } else {
         b->f = fopen(bundle_path, "wb+");
@@ -295,17 +299,18 @@ struct RuckSackBundle *rucksack_bundle_open(const char *bundle_path) {
             int err = write_header(b);
             if (err) {
                 free(b);
-                return NULL;
+                *out_bundle = NULL;
+                return err;
             }
         } else {
             free(b);
-            fprintf(stderr, "Unable to open %s for read/write/update\n",
-                    bundle_path);
-            return NULL;
+            *out_bundle = NULL;
+            return RuckSackErrorFileAccess;
         }
     }
 
-    return &b->externals;
+    *out_bundle = &b->externals;
+    return RuckSackErrorNone;
 }
 
 void rucksack_bundle_close(struct RuckSackBundle *bundle) {
@@ -326,7 +331,7 @@ void rucksack_bundle_close(struct RuckSackBundle *bundle) {
 
 struct RuckSackPage *rucksack_page_create(void) {
     struct RuckSackPagePrivate *p = calloc(1, sizeof(struct RuckSackPagePrivate));
-    assert(p);
+    if (!p) return NULL;
     struct RuckSackPage *page = &p->externals;
     page->max_width = 1024;
     page->max_height = 1024;
@@ -353,23 +358,24 @@ int rucksack_page_add_image(struct RuckSackPage *page, const char *key,
     struct RuckSackPagePrivate *p = (struct RuckSackPagePrivate *) page;
 
     FREE_IMAGE_FORMAT fmt = FreeImage_GetFileType(userimg->path, 0);
+
+    if (fmt == FIF_UNKNOWN || FreeImage_FIFSupportsReading(fmt))
+        return RuckSackErrorImageFormat;
+
     FIBITMAP *bmp = FreeImage_Load(fmt, userimg->path, 0);
 
-    if (!bmp) {
-        fprintf(stderr, "unable to open %s for reading\n", userimg->path);
-        return -1;
-    }
+    if (!bmp)
+        return RuckSackErrorFileAccess;
 
-    if (!FreeImage_HasPixels(bmp)) {
-        fprintf(stderr, "picture file %s has no pixels\n", userimg->path);
-        return -1;
-    }
+    if (!FreeImage_HasPixels(bmp))
+        return RuckSackErrorNoPixels;
 
     if (p->images_count >= p->images_size) {
         p->images_size += 512;
         struct RuckSackImagePrivate *new_ptr = realloc(p->images,
                 p->images_size * sizeof(struct RuckSackImagePrivate));
-        assert(new_ptr);
+        if (!new_ptr)
+            return RuckSackErrorNoMem;
         p->images = new_ptr;
     }
     struct RuckSackImagePrivate *i = &p->images[p->images_count];
@@ -423,12 +429,12 @@ int rucksack_page_add_image(struct RuckSackPage *page, const char *key,
             img->anchor_y = img->height - 1;
             break;
         default:
-            assert(0);
+            return RuckSackErrorInvalidAnchor;
     }
 
     i->key = strdup(key);
 
-    return 0;
+    return RuckSackErrorNone;
 }
 
 static int compare_images(const void *a, const void *b) {
@@ -478,14 +484,13 @@ static struct Rect *add_free_rect(struct RuckSackPagePrivate *p) {
         p->free_pos_size += 512;
         struct Rect *new_ptr = realloc(p->free_positions,
                 p->free_pos_size * sizeof(struct Rect));
-        assert(new_ptr);
+        if (!new_ptr)
+            return NULL;
         p->free_positions = new_ptr;
     }
     struct Rect *ptr = &p->free_positions[p->free_pos_count];
     p->free_pos_count += 1;
 
-    fprintf(stderr, "add_free_rect. garbage count: %d, free_pos_count: %d\n",
-            p->garbage_count, p->free_pos_count);
     return ptr;
 }
 
@@ -501,9 +506,6 @@ static void remove_free_rect(struct RuckSackPagePrivate *p, struct Rect *r) {
         next_free_pos_count -= 1;
         p->garbage_count -= 1;
     }
-
-    fprintf(stderr, "remove_free_rect. garbage count: %d, free_pos_count: %d\n",
-            p->garbage_count, p->free_pos_count);
 }
 
 static char rects_intersect(struct Rect *r1, struct Rect *r2) {
@@ -523,6 +525,8 @@ static int do_maxrect_bssf(struct RuckSackPage *page) {
     qsort(p->images, p->images_count, sizeof(struct RuckSackImagePrivate), compare_images);
 
     struct Rect *r = add_free_rect(p);
+    if (!r)
+        return RuckSackErrorNoMem;
     r->x = 0;
     r->y = 0;
     r->w = page->max_width;
@@ -572,10 +576,8 @@ static int do_maxrect_bssf(struct RuckSackPage *page) {
             }
         }
 
-        if (!best_rect) {
-            fprintf(stderr, "unable to fit all images into page\n");
-            return -1;
-        }
+        if (!best_rect)
+            return RuckSackErrorCannotFit;
 
         // place image at top left of this rect
         struct Rect img_rect;
@@ -587,8 +589,6 @@ static int do_maxrect_bssf(struct RuckSackPage *page) {
         img->x = img_rect.x;
         img->y = img_rect.y;
         img->r90 = best_short_side_is_r90;
-        fprintf(stderr, "placed image at %d, %d %s\n", img->x, img->y,
-                img->r90 ? "sideways" : "");
 
         // keep track of page boundaries
         p->width = MAX(img->x + img_rect.w, p->width);
@@ -596,12 +596,16 @@ static int do_maxrect_bssf(struct RuckSackPage *page) {
 
         // insert the two new rectangles into our set
         struct Rect *horiz = add_free_rect(p);
+        if (!horiz)
+            return RuckSackErrorNoMem;
         horiz->x = best_rect->x;
         horiz->y = best_rect->y + image->height;
         horiz->w = best_rect->w;
         horiz->h = best_rect->h - image->height;
 
         struct Rect *vert  = add_free_rect(p);
+        if (!vert)
+            return RuckSackErrorNoMem;
         vert->x = best_rect->x + image->width;
         vert->y = best_rect->y;
         vert->w = best_rect->w - image->width;
@@ -629,6 +633,8 @@ static int do_maxrect_bssf(struct RuckSackPage *page) {
                 outer.h = free_r->h;
                 if (outer.w > 0) {
                     struct Rect *new_free_rect = add_free_rect(p);
+                    if (!new_free_rect)
+                        return RuckSackErrorNoMem;
                     *new_free_rect = outer;
                 }
 
@@ -639,6 +645,8 @@ static int do_maxrect_bssf(struct RuckSackPage *page) {
                 outer.h = free_r->h;
                 if (outer.w > 0) {
                     struct Rect *new_free_rect = add_free_rect(p);
+                    if (!new_free_rect)
+                        return RuckSackErrorNoMem;
                     *new_free_rect = outer;
                 }
 
@@ -649,6 +657,8 @@ static int do_maxrect_bssf(struct RuckSackPage *page) {
                 outer.h = img->y - free_r->y;
                 if (outer.h > 0) {
                     struct Rect *new_free_rect = add_free_rect(p);
+                    if (!new_free_rect)
+                        return RuckSackErrorNoMem;
                     *new_free_rect = outer;
                 }
 
@@ -659,6 +669,8 @@ static int do_maxrect_bssf(struct RuckSackPage *page) {
                 outer.h = free_r->y + free_r->h - outer.y;
                 if (outer.h > 0) {
                     struct Rect *new_free_rect = add_free_rect(p);
+                    if (!new_free_rect)
+                        return RuckSackErrorNoMem;
                     *new_free_rect = outer;
                 }
 
@@ -707,7 +719,7 @@ static int do_maxrect_bssf(struct RuckSackPage *page) {
         }
     }
 
-    return 0;
+    return RuckSackErrorNone;
 }
 
 static int next_pow2(int x) {
@@ -724,10 +736,8 @@ int rucksack_bundle_add_page(struct RuckSackBundle *bundle, const char *key,
 
     // assigns x and y positions to all images
     int err = do_maxrect_bssf(page);
-    if (err != 0) {
-        fprintf(stderr, "unable to find a maxrect packing for all images in the page\n");
+    if (err)
         return err;
-    }
 
     // find the smallest power of 2 width/height
     if (page->pow2) {
@@ -794,7 +804,7 @@ int rucksack_bundle_add_page(struct RuckSackBundle *bundle, const char *key,
     rucksack_stream_close(stream);
     FreeImage_CloseMemory(out_stream);
 
-    return 0;
+    return RuckSackErrorNone;
 }
 
 int rucksack_bundle_add_file(struct RuckSackBundle *bundle, const char *key,
@@ -802,16 +812,13 @@ int rucksack_bundle_add_file(struct RuckSackBundle *bundle, const char *key,
 {
     FILE *f = fopen(file_name, "rb");
 
-    if (!f) {
-        fprintf(stderr, "unable to open %s\n", file_name);
+    if (!f)
         return RuckSackErrorFileAccess;
-    }
 
     struct stat st;
     int err = fstat(fileno(f), &st);
 
     if (err != 0) {
-        perror("unable to stat");
         fclose(f);
         return RuckSackErrorFileAccess;
     }

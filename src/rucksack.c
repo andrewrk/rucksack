@@ -16,7 +16,7 @@
 
 const char *BUNDLE_UUID = "\x60\x70\xc8\x99\x82\xa1\x41\x84\x89\x51\x08\xc9\x1c\xc9\xb6\x20";
 
-struct RuckSackHeaderEntry {
+struct RuckSackFileEntry {
     uint64_t offset;
     uint64_t size;
     uint64_t allocated_size;
@@ -31,12 +31,12 @@ struct RuckSackBundlePrivate {
 
     uint32_t first_header_offset;
     uint32_t header_entry_count;
-    struct RuckSackHeaderEntry *entries;
+    struct RuckSackFileEntry *entries;
     uint32_t header_entry_mem_size;
 
     // keep some stuff cached for quick access
-    struct RuckSackHeaderEntry *first_entry;
-    struct RuckSackHeaderEntry *last_entry;
+    struct RuckSackFileEntry *first_entry;
+    struct RuckSackFileEntry *last_entry;
     uint32_t headers_byte_count;
     uint32_t first_file_offset;
 };
@@ -77,7 +77,7 @@ struct RuckSackPagePrivate {
 
 struct RuckSackOutStream {
     struct RuckSackBundlePrivate *b;
-    struct RuckSackHeaderEntry *e;
+    struct RuckSackFileEntry *e;
     size_t pos;
 };
 
@@ -188,7 +188,7 @@ static int read_header(struct RuckSackBundlePrivate *b) {
     b->first_header_offset = read_uint32be(&buf[16]);
     b->header_entry_count = read_uint32be(&buf[20]);
     b->header_entry_mem_size = alloc_count(b->header_entry_count);
-    b->entries = calloc(b->header_entry_mem_size, sizeof(struct RuckSackHeaderEntry));
+    b->entries = calloc(b->header_entry_mem_size, sizeof(struct RuckSackFileEntry));
 
     if (!b->entries)
         return RuckSackErrorNoMem;
@@ -205,7 +205,7 @@ static int read_header(struct RuckSackBundlePrivate *b) {
             return RuckSackErrorInvalidFormat;
         uint32_t entry_size = read_uint32be(&buf[0]);
         header_offset += entry_size;
-        struct RuckSackHeaderEntry *entry = &b->entries[i];
+        struct RuckSackFileEntry *entry = &b->entries[i];
         entry->offset = read_uint64be(&buf[4]);
         entry->size = read_uint64be(&buf[12]);
         entry->allocated_size = read_uint64be(&buf[20]);
@@ -231,12 +231,12 @@ static int read_header(struct RuckSackBundlePrivate *b) {
     return RuckSackErrorNone;
 }
 
-static struct RuckSackHeaderEntry *get_prev_entry(struct RuckSackBundlePrivate *b,
-        struct RuckSackHeaderEntry *entry)
+static struct RuckSackFileEntry *get_prev_entry(struct RuckSackBundlePrivate *b,
+        struct RuckSackFileEntry *entry)
 {
-    struct RuckSackHeaderEntry *prev = NULL;
+    struct RuckSackFileEntry *prev = NULL;
     for (int i = 0; i < b->header_entry_count; i += 1) {
-        struct RuckSackHeaderEntry *e = &b->entries[i];
+        struct RuckSackFileEntry *e = &b->entries[i];
 
         if (((e->offset < entry->offset) && !prev) || (e->offset > prev->offset))
             prev = e;
@@ -244,12 +244,12 @@ static struct RuckSackHeaderEntry *get_prev_entry(struct RuckSackBundlePrivate *
     return prev;
 }
 
-static struct RuckSackHeaderEntry *get_next_entry(struct RuckSackBundlePrivate *b,
-        struct RuckSackHeaderEntry *entry)
+static struct RuckSackFileEntry *get_next_entry(struct RuckSackBundlePrivate *b,
+        struct RuckSackFileEntry *entry)
 {
-    struct RuckSackHeaderEntry *next = NULL;
+    struct RuckSackFileEntry *next = NULL;
     for (int i = 0; i < b->header_entry_count; i += 1) {
-        struct RuckSackHeaderEntry *e = &b->entries[i];
+        struct RuckSackFileEntry *e = &b->entries[i];
 
         if (((e->offset > entry->offset) && !next) || (e->offset < next->offset))
             next = e;
@@ -298,7 +298,7 @@ static int copy_data(struct RuckSackBundlePrivate *b, uint64_t source,
 }
 
 static void allocate_file(struct RuckSackBundlePrivate *b, size_t size,
-        struct RuckSackHeaderEntry *entry)
+        struct RuckSackFileEntry *entry)
 {
     entry->allocated_size = size;
 
@@ -320,7 +320,7 @@ static void allocate_file(struct RuckSackBundlePrivate *b, size_t size,
     // figure out offset and allocated_size
     // find a file that has too much allocated room and stick it there
     for (int i = 0; i < b->header_entry_count; i += 1) {
-        struct RuckSackHeaderEntry *e = &b->entries[i];
+        struct RuckSackFileEntry *e = &b->entries[i];
 
         // don't overwrite a stream!
         if (e->is_open) continue;
@@ -368,7 +368,7 @@ static void allocate_file(struct RuckSackBundlePrivate *b, size_t size,
 
 
 static int resize_file_entry(struct RuckSackBundlePrivate *b,
-        struct RuckSackHeaderEntry *entry, size_t size)
+        struct RuckSackFileEntry *entry, size_t size)
 {
     // extend the allocation of the thing before the old entry
     if (entry == b->last_entry) {
@@ -379,7 +379,7 @@ static int resize_file_entry(struct RuckSackBundlePrivate *b,
         b->first_entry = get_next_entry(b, entry);
         b->first_file_offset = b->first_entry->offset;
     } else {
-        struct RuckSackHeaderEntry *prev = get_prev_entry(b, entry);
+        struct RuckSackFileEntry *prev = get_prev_entry(b, entry);
         prev->allocated_size += entry->allocated_size;
     }
 
@@ -409,7 +409,7 @@ static int write_header(struct RuckSackBundlePrivate *b) {
         uint32_t wanted_entry_bytes = alloc_size(b->headers_byte_count);
         uint32_t wanted_offset_end = b->first_header_offset + wanted_entry_bytes;
         for (int i = 0; i < b->header_entry_count; i += 1) {
-            struct RuckSackHeaderEntry *entry = &b->entries[i];
+            struct RuckSackFileEntry *entry = &b->entries[i];
             if (entry->offset < wanted_offset_end) {
                 int err = resize_file_entry(b, entry, alloc_size(entry->size));
                 if (err)
@@ -422,7 +422,7 @@ static int write_header(struct RuckSackBundlePrivate *b) {
         return RuckSackErrorFileAccess;
 
     for (int i = 0; i < b->header_entry_count; i += 1) {
-        struct RuckSackHeaderEntry *entry = &b->entries[i];
+        struct RuckSackFileEntry *entry = &b->entries[i];
         write_uint32be(&buf[0], 32 + entry->key_size);
         write_uint64be(&buf[4], entry->offset);
         write_uint64be(&buf[12], entry->size);
@@ -491,7 +491,7 @@ int rucksack_bundle_close(struct RuckSackBundle *bundle) {
 
     if (b->entries) {
         for (int i = 0; i < b->header_entry_count; i += 1) {
-            struct RuckSackHeaderEntry *entry = &b->entries[i];
+            struct RuckSackFileEntry *entry = &b->entries[i];
             if (entry->key)
                 free(entry->key);
         }
@@ -1033,13 +1033,13 @@ int rucksack_bundle_add_file(struct RuckSackBundle *bundle, const char *key,
 }
 
 static int allocate_file_entry(struct RuckSackBundlePrivate *b, const char *key,
-        size_t size, struct RuckSackHeaderEntry **out_entry)
+        size_t size, struct RuckSackFileEntry **out_entry)
 {
     // create a new entry
     if (b->header_entry_count >= b->header_entry_mem_size) {
         b->header_entry_mem_size = alloc_count(b->header_entry_mem_size);
-        struct RuckSackHeaderEntry *new_ptr = realloc(b->entries,
-                b->header_entry_mem_size * sizeof(struct RuckSackHeaderEntry));
+        struct RuckSackFileEntry *new_ptr = realloc(b->entries,
+                b->header_entry_mem_size * sizeof(struct RuckSackFileEntry));
         if (!new_ptr) {
             *out_entry = NULL;
             return RuckSackErrorNoMem;
@@ -1048,7 +1048,7 @@ static int allocate_file_entry(struct RuckSackBundlePrivate *b, const char *key,
         memset(new_ptr + b->header_entry_count, 0, clear_amt);
         b->entries = new_ptr;
     }
-    struct RuckSackHeaderEntry *entry = &b->entries[b->header_entry_count];
+    struct RuckSackFileEntry *entry = &b->entries[b->header_entry_count];
     b->header_entry_count += 1;
     entry->key_size = strlen(key);
     entry->key = strdup(key);
@@ -1060,11 +1060,11 @@ static int allocate_file_entry(struct RuckSackBundlePrivate *b, const char *key,
     return RuckSackErrorNone;
 }
 
-static struct RuckSackHeaderEntry *find_file_entry(struct RuckSackBundlePrivate *b,
+static struct RuckSackFileEntry *find_file_entry(struct RuckSackBundlePrivate *b,
         const char *key)
 {
     for (int i = 0; i < b->header_entry_count; i += 1) {
-        struct RuckSackHeaderEntry *e = &b->entries[i];
+        struct RuckSackFileEntry *e = &b->entries[i];
         if (strcmp(key, e->key) == 0)
             return e;
     }
@@ -1072,10 +1072,10 @@ static struct RuckSackHeaderEntry *find_file_entry(struct RuckSackBundlePrivate 
 }
 
 static int get_file_entry(struct RuckSackBundlePrivate *b, const char *key,
-        size_t size, struct RuckSackHeaderEntry **out_entry)
+        size_t size, struct RuckSackFileEntry **out_entry)
 {
     // return info for existing entry
-    struct RuckSackHeaderEntry *e = find_file_entry(b, key);
+    struct RuckSackFileEntry *e = find_file_entry(b, key);
     if (e) {
         if (e->allocated_size < size) {
             int err = resize_file_entry(b, e, size);
@@ -1145,22 +1145,19 @@ int rucksack_stream_write(struct RuckSackOutStream *stream, const void *ptr,
     return RuckSackErrorNone;
 }
 
-int rucksack_bundle_get_file_size(struct RuckSackBundle *bundle,
-        const char *key, size_t *size)
-{
+struct RuckSackFileEntry *rucksack_bundle_find_file(struct RuckSackBundle *bundle, const char *key) {
     struct RuckSackBundlePrivate *b = (struct RuckSackBundlePrivate *) bundle;
-    struct RuckSackHeaderEntry *e = find_file_entry(b, key);
-    if (!e) return RuckSackErrorNotFound;
-    *size = e->size;
-    return RuckSackErrorNone;
+    return find_file_entry(b, key);
 }
 
-int rucksack_bundle_get_file(struct RuckSackBundle *bundle, const char *key,
+size_t rucksack_file_size(struct RuckSackFileEntry *file) {
+    return file->size;
+}
+
+int rucksack_bundle_file_read(struct RuckSackBundle *bundle, struct RuckSackFileEntry *e,
         unsigned char *buffer)
 {
     struct RuckSackBundlePrivate *b = (struct RuckSackBundlePrivate *) bundle;
-    struct RuckSackHeaderEntry *e = find_file_entry(b, key);
-    if (!e) return RuckSackErrorNotFound;
     if (fseek(b->f, e->offset, SEEK_SET))
         return RuckSackErrorFileAccess;
     if (fread(buffer, 1, e->size, b->f) != e->size)

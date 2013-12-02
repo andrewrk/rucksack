@@ -37,12 +37,14 @@ static void test_write_read(void) {
 
     ok(rucksack_bundle_add_file(bundle, "blah", "../test/blah.txt"));
 
-    size_t size;
-    ok(rucksack_bundle_get_file_size(bundle, "blah", &size));
+    struct RuckSackFileEntry *entry = rucksack_bundle_find_file(bundle, "blah");
+    assert(entry);
+
+    size_t size = rucksack_file_size(entry);
     assert(size == 10);
 
     char buf[11];
-    ok(rucksack_bundle_get_file(bundle, "blah", (unsigned char *)buf));
+    ok(rucksack_bundle_file_read(bundle, entry, (unsigned char *)buf));
     buf[10] = 0;
     assert(strcmp(buf, "aoeu\n1234\n") == 0);
 

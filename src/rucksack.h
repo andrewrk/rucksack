@@ -21,6 +21,8 @@ struct RuckSackBundle {
 
 };
 
+struct RuckSackFileEntry;
+
 enum RuckSackAnchor {
     RuckSackAnchorCenter,
     RuckSackAnchorExplicit,
@@ -79,10 +81,11 @@ int rucksack_bundle_del(struct RuckSackBundle *bundle, const char *key);
 int rucksack_page_add_image(struct RuckSackPage *page, const char *key,
         struct RuckSackImage *image);
 
-int rucksack_bundle_get_file_size(struct RuckSackBundle *bundle,
-        const char *key, size_t *size);
-int rucksack_bundle_get_file(struct RuckSackBundle *bundle, const char *key,
-        unsigned char *buffer);
+struct RuckSackFileEntry *rucksack_bundle_find_file(
+        struct RuckSackBundle *bundle, const char *key);
+size_t rucksack_file_size(struct RuckSackFileEntry *entry);
+int rucksack_bundle_file_read(struct RuckSackBundle *bundle,
+        struct RuckSackFileEntry *entry, unsigned char *buffer);
 
 void rucksack_bundle_get_page(struct RuckSackBundle *bundle, const char *key,
         struct RuckSackPage *page);

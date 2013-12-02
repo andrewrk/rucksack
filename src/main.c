@@ -113,6 +113,7 @@ static const char *RS_ERROR_STR[] = {
     "cannot fit all images into page",
     "image has no pixels",
     "unrecognized image format",
+    "key not found",
 };
 
 static int parse_error(const char *msg) {

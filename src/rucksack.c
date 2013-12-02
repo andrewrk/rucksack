@@ -1060,23 +1060,32 @@ static int allocate_file_entry(struct RuckSackBundlePrivate *b, const char *key,
     return RuckSackErrorNone;
 }
 
+static struct RuckSackHeaderEntry *find_file_entry(struct RuckSackBundlePrivate *b,
+        const char *key)
+{
+    for (int i = 0; i < b->header_entry_count; i += 1) {
+        struct RuckSackHeaderEntry *e = &b->entries[i];
+        if (strcmp(key, e->key) == 0)
+            return e;
+    }
+    return NULL;
+}
+
 static int get_file_entry(struct RuckSackBundlePrivate *b, const char *key,
         size_t size, struct RuckSackHeaderEntry **out_entry)
 {
     // return info for existing entry
-    for (int i = 0; i < b->header_entry_count; i += 1) {
-        struct RuckSackHeaderEntry *e = &b->entries[i];
-        if (strcmp(key, e->key) == 0) {
-            if (e->allocated_size < size) {
-                int err = resize_file_entry(b, e, size);
-                if (err) {
-                    *out_entry = NULL;
-                    return err;
-                }
+    struct RuckSackHeaderEntry *e = find_file_entry(b, key);
+    if (e) {
+        if (e->allocated_size < size) {
+            int err = resize_file_entry(b, e, size);
+            if (err) {
+                *out_entry = NULL;
+                return err;
             }
-            *out_entry = e;
-            return RuckSackErrorNone;
         }
+        *out_entry = e;
+        return RuckSackErrorNone;
     }
 
     // none found, allocate new entry
@@ -1133,5 +1142,28 @@ int rucksack_stream_write(struct RuckSackOutStream *stream, const void *ptr,
 
     stream->e->size += count;
 
+    return RuckSackErrorNone;
+}
+
+int rucksack_bundle_get_file_size(struct RuckSackBundle *bundle,
+        const char *key, size_t *size)
+{
+    struct RuckSackBundlePrivate *b = (struct RuckSackBundlePrivate *) bundle;
+    struct RuckSackHeaderEntry *e = find_file_entry(b, key);
+    if (!e) return RuckSackErrorNotFound;
+    *size = e->size;
+    return RuckSackErrorNone;
+}
+
+int rucksack_bundle_get_file(struct RuckSackBundle *bundle, const char *key,
+        unsigned char *buffer)
+{
+    struct RuckSackBundlePrivate *b = (struct RuckSackBundlePrivate *) bundle;
+    struct RuckSackHeaderEntry *e = find_file_entry(b, key);
+    if (!e) return RuckSackErrorNotFound;
+    if (fseek(b->f, e->offset, SEEK_SET))
+        return RuckSackErrorFileAccess;
+    if (fread(buffer, 1, e->size, b->f) != e->size)
+        return RuckSackErrorFileAccess;
     return RuckSackErrorNone;
 }

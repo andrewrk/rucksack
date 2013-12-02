@@ -12,6 +12,7 @@ enum RuckSackError {
     RuckSackErrorCannotFit,
     RuckSackErrorNoPixels,
     RuckSackErrorImageFormat,
+    RuckSackErrorNotFound,
 };
 
 struct RuckSackBundle {
@@ -79,8 +80,8 @@ int rucksack_page_add_image(struct RuckSackPage *page, const char *key,
         struct RuckSackImage *image);
 
 int rucksack_bundle_get_file_size(struct RuckSackBundle *bundle,
-        const char *key);
-void rucksack_bundle_get_file(struct RuckSackBundle *bundle, const char *key,
+        const char *key, size_t *size);
+int rucksack_bundle_get_file(struct RuckSackBundle *bundle, const char *key,
         unsigned char *buffer);
 
 void rucksack_bundle_get_page(struct RuckSackBundle *bundle, const char *key,

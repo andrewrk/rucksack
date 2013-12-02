@@ -1,5 +1,7 @@
 #include <rucksack.h>
 #include <stdio.h>
+#include <assert.h>
+#include <string.h>
 
 static const char *RS_ERROR_STR[] = {
     "",
@@ -10,12 +12,13 @@ static const char *RS_ERROR_STR[] = {
     "cannot fit all images into page",
     "image has no pixels",
     "unrecognized image format",
+    "key not found",
 };
 
 static void ok(int err) {
     if (!err) return;
     fprintf(stderr, "Error: %s\n", RS_ERROR_STR[err]);
-    exit(1);
+    assert(0);
 }
 
 static void test_open_close(void) {
@@ -26,6 +29,26 @@ static void test_open_close(void) {
     ok(rucksack_bundle_close(bundle));
 }
 
+static void test_write_read(void) {
+    const char *bundle_name = "test.bundle";
+    remove(bundle_name);
+    struct RuckSackBundle *bundle;
+    ok(rucksack_bundle_open(bundle_name, &bundle));
+
+    ok(rucksack_bundle_add_file(bundle, "blah", "../test/blah.txt"));
+
+    size_t size;
+    ok(rucksack_bundle_get_file_size(bundle, "blah", &size));
+    assert(size == 10);
+
+    char buf[11];
+    ok(rucksack_bundle_get_file(bundle, "blah", (unsigned char *)buf));
+    buf[10] = 0;
+    assert(strcmp(buf, "aoeu\n1234\n") == 0);
+
+    ok(rucksack_bundle_close(bundle));
+}
+
 struct Test {
     const char *name;
     void (*fn)(void);
@@ -33,6 +56,7 @@ struct Test {
 
 static struct Test tests[] = {
     {"opening and closing", test_open_close},
+    {"writing and reading", test_write_read},
     {NULL, NULL},
 };
 

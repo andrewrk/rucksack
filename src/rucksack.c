@@ -217,12 +217,13 @@ static int read_header(struct RuckSackBundlePrivate *b) {
         entry->size = read_uint64be(&buf[12]);
         entry->allocated_size = read_uint64be(&buf[20]);
         entry->key_size = read_uint32be(&buf[28]);
-        entry->key = malloc(entry->key_size);
+        entry->key = malloc(entry->key_size + 1);
         if (!entry->key)
             return RuckSackErrorNoMem;
         amt_read = fread(entry->key, 1, entry->key_size, f);
         if (amt_read != entry->key_size)
             return RuckSackErrorInvalidFormat;
+        entry->key[entry->key_size] = 0;
 
         b->headers_byte_count += 32 + entry->key_size;
 

@@ -49,6 +49,21 @@ static void test_write_read(void) {
     assert(strcmp(buf, "aoeu\n1234\n") == 0);
 
     ok(rucksack_bundle_close(bundle));
+
+    ok(rucksack_bundle_open(bundle_name, &bundle));
+
+    entry = rucksack_bundle_find_file(bundle, "blah");
+    assert(entry);
+
+    size = rucksack_file_size(entry);
+    assert(size == 10);
+
+    memset(buf, 0, 11);
+    ok(rucksack_bundle_file_read(bundle, entry, (unsigned char *)buf));
+    assert(strcmp(buf, "aoeu\n1234\n") == 0);
+
+
+    ok(rucksack_bundle_close(bundle));
 }
 
 struct Test {

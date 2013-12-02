@@ -542,7 +542,7 @@ int rucksack_page_add_image(struct RuckSackPage *page, const char *key,
 
     FREE_IMAGE_FORMAT fmt = FreeImage_GetFileType(userimg->path, 0);
 
-    if (fmt == FIF_UNKNOWN || FreeImage_FIFSupportsReading(fmt))
+    if (fmt == FIF_UNKNOWN || !FreeImage_FIFSupportsReading(fmt))
         return RuckSackErrorImageFormat;
 
     FIBITMAP *bmp = FreeImage_Load(fmt, userimg->path, 0);

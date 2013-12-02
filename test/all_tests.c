@@ -73,6 +73,37 @@ static void test_write_read(void) {
     ok(rucksack_bundle_close(bundle));
 }
 
+static void test_texture_packing(void) {
+    const char *bundle_name = "test.bundle";
+    remove(bundle_name);
+    struct RuckSackBundle *bundle;
+    ok(rucksack_bundle_open(bundle_name, &bundle));
+
+    struct RuckSackPage *page = rucksack_page_create();
+    assert(page);
+
+    struct RuckSackImage img;
+    img.anchor = RuckSackAnchorCenter;
+
+    img.path = "../test/file0.png";
+    ok(rucksack_page_add_image(page, "image0", &img));
+
+    img.path = "../test/file1.png";
+    ok(rucksack_page_add_image(page, "image1", &img));
+
+    img.path = "../test/file2.png";
+    ok(rucksack_page_add_image(page, "image2", &img));
+
+    img.path = "../test/file3.png";
+    ok(rucksack_page_add_image(page, "image3", &img));
+
+    ok(rucksack_bundle_add_page(bundle, "texture_foo", page));
+
+    rucksack_page_destroy(page);
+
+    ok(rucksack_bundle_close(bundle));
+}
+
 struct Test {
     const char *name;
     void (*fn)(void);
@@ -81,6 +112,7 @@ struct Test {
 static struct Test tests[] = {
     {"opening and closing", test_open_close},
     {"writing and reading", test_write_read},
+    {"texture packing", test_texture_packing},
     {NULL, NULL},
 };
 

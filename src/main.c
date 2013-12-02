@@ -475,10 +475,6 @@ static int on_end(struct LaxJsonContext *json, enum LaxJsonType type) {
     return 0;
 }
 
-static void print_rs_error(int err) {
-    fprintf(stderr, "Error: %s\n", RS_ERROR_STR[err]);
-}
-
 static int bundle_usage(char *arg0) {
     fprintf(stderr, "Usage: %s bundle assetsfile bundlefile\n"
             "\n"
@@ -538,7 +534,7 @@ static int command_bundle(char *arg0, int argc, char *argv[]) {
 
     int rs_err = rucksack_bundle_open(bundle_filename, &bundle);
     if (rs_err) {
-        print_rs_error(rs_err);
+        fprintf(stderr, "unable to open bundle %s\n", RS_ERROR_STR[rs_err]);
         return 1;
     }
 
@@ -571,7 +567,7 @@ static int command_bundle(char *arg0, int argc, char *argv[]) {
 
     rs_err = rucksack_bundle_close(bundle);
     if (rs_err) {
-        print_rs_error(rs_err);
+        fprintf(stderr, "unable to close bundle: %s\n", RS_ERROR_STR[rs_err]);
         return 1;
     }
 
@@ -606,7 +602,7 @@ static int command_extract(char *arg0, int argc, char *argv[]) {
 
     int rs_err = rucksack_bundle_open(bundle_filename, &bundle);
     if (rs_err) {
-        print_rs_error(rs_err);
+        fprintf(stderr, "unable to open bundle: %s\n", RS_ERROR_STR[rs_err]);
         return 1;
     }
 
@@ -621,7 +617,7 @@ static int command_extract(char *arg0, int argc, char *argv[]) {
     rs_err = rucksack_bundle_file_read(bundle, entry, buffer);
 
     if (rs_err) {
-        print_rs_error(rs_err);
+        fprintf(stderr, "unable to read file entry: %s\n", RS_ERROR_STR[rs_err]);
         return 1;
     }
 
@@ -634,7 +630,7 @@ static int command_extract(char *arg0, int argc, char *argv[]) {
 
     rs_err = rucksack_bundle_close(bundle);
     if (rs_err) {
-        print_rs_error(rs_err);
+        fprintf(stderr, "unable to close bundle: %s\n", RS_ERROR_STR[rs_err]);
         return 1;
     }
 
@@ -675,7 +671,7 @@ static int command_list(char *arg0, int argc, char *argv[]) {
 
     int rs_err = rucksack_bundle_open(bundle_filename, &bundle);
     if (rs_err) {
-        print_rs_error(rs_err);
+        fprintf(stderr, "unable to open bundle: %s\n", RS_ERROR_STR[rs_err]);
         return 1;
     }
 
@@ -699,7 +695,7 @@ static int command_list(char *arg0, int argc, char *argv[]) {
 
     rs_err = rucksack_bundle_close(bundle);
     if (rs_err) {
-        print_rs_error(rs_err);
+        fprintf(stderr, "unable to close bundle: %s\n", RS_ERROR_STR[rs_err]);
         return 1;
     }
 

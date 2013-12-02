@@ -42,7 +42,7 @@ configure_file (
 file(GLOB_RECURSE SOURCES ${PROJECT_SOURCE_DIR}/src/*.c)
 file(GLOB_RECURSE HEADERS ${PROJECT_SOURCE_DIR}/src/*.h)
 
-set(EXE_CFLAGS "${C99_C_FLAGS} -pedantic -Werror -Wall -Werror=strict-prototypes -Werror=old-style-definition -Werror=missing-prototypes")
+set(EXE_CFLAGS "${C99_C_FLAGS} -pedantic -Werror -Wall -Werror=strict-prototypes -Werror=old-style-definition -Werror=missing-prototypes -D_POSIX_C_SOURCE=200809L")
 
 add_executable(rucksack ${SOURCES} ${HEADERS})
 target_link_libraries(rucksack ${FreeImage_LIBRARIES} ${LAXJSON_LIBRARIES})

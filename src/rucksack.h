@@ -1,3 +1,15 @@
+#ifndef RUCKSACK_H_INCLUDED
+#define RUCKSACK_H_INCLUDED
+
+#include <stdlib.h>
+
+enum RuckSackError {
+    RuckSackErrorNone,
+    RuckSackErrorNoMem,
+    RuckSackErrorFileAccess,
+    RuckSackErrorInvalidFormat,
+};
+
 struct RuckSackBundle {
     // the directory to do all path searches relative to
     const char *cwd;
@@ -39,6 +51,8 @@ struct RuckSackPage {
     char pow2;
 };
 
+struct RuckSackOutStream;
+
 void rucksack_init(void);
 void rucksack_finish(void);
 
@@ -50,14 +64,18 @@ void rucksack_page_destroy(struct RuckSackPage *page);
 
 int rucksack_bundle_add_page(struct RuckSackBundle *bundle, const char *key,
         struct RuckSackPage *page);
-void rucksack_bundle_add_file(struct RuckSackBundle *bundle, const char *key,
+int rucksack_bundle_add_file(struct RuckSackBundle *bundle, const char *key,
         const char *file_name);
-void rucksack_bundle_del(struct RuckSackBundle *bundle, const char *key);
+
+int rucksack_bundle_add_stream(struct RuckSackBundle *bundle, const char *key,
+        size_t size_guess, struct RuckSackOutStream **stream);
+int rucksack_bundle_del(struct RuckSackBundle *bundle, const char *key);
 
 int rucksack_page_add_image(struct RuckSackPage *page, const char *key,
         struct RuckSackImage *image);
 
-int rucksack_bundle_get_file_size(struct RuckSackBundle *bundle, const char *key);
+int rucksack_bundle_get_file_size(struct RuckSackBundle *bundle,
+        const char *key);
 void rucksack_bundle_get_file(struct RuckSackBundle *bundle, const char *key,
         unsigned char *buffer);
 
@@ -65,3 +83,9 @@ void rucksack_bundle_get_page(struct RuckSackBundle *bundle, const char *key,
         struct RuckSackPage *page);
 void rucksack_page_get_image(struct RuckSackPage *page, const char *key,
         struct RuckSackImage *image);
+
+int rucksack_stream_write(struct RuckSackOutStream *stream, const void *ptr,
+        size_t count);
+void rucksack_stream_close(struct RuckSackOutStream *stream);
+
+#endif /* RUCKSACK_H_INCLUDED */

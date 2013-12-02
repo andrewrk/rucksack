@@ -30,6 +30,11 @@ enum State {
     StateTextureMaxWidth,
     StateTextureMaxHeight,
     StateTexturePow2,
+    StateExpectFilesObject,
+    StateFileName,
+    StateFileObjectBegin,
+    StateFilePropName,
+    StateFilePropPath,
 };
 
 static const char *STATE_STR[] = {
@@ -52,6 +57,11 @@ static const char *STATE_STR[] = {
     "StateTextureMaxWidth",
     "StateTextureMaxHeight",
     "StateTexturePow2",
+    "StateExpectFilesObject",
+    "StateFileName",
+    "StateFileObjectBegin",
+    "StateFilePropName",
+    "StateFilePropPath",
 };
 
 static enum State state;
@@ -61,25 +71,13 @@ static char strbuf[500];
 static struct RuckSackPage *page = NULL;
 static char *page_key = NULL;
 
+static char *file_key = NULL;
+static char *file_path = NULL;
+
 struct RuckSackImage image;
 static char *image_key = NULL;
 
-static int usage(char *arg0) {
-    fprintf(stderr, "Usage: %s assets.json\n"
-            "\n"
-            "Options:\n"
-            "  [--dir outputdir]  defaults to current directory\n"
-            "  [--format json]    'json' or 'plain'\n"
-            , arg0);
-    return 1;
-}
-
-static char *mystrdup (const char *s) {
-    char *d = malloc (strlen (s) + 1);
-    if (!d) return NULL;
-    strcpy(d, s);
-    return d;
-}
+static char *path_prefix = ".";
 
 static const char *ERR_STR[] = {
     "",
@@ -115,6 +113,17 @@ static int parse_error(const char *msg) {
     return -1;
 }
 
+static char *resolve_path(const char *path) {
+    if (path[0] == '/') {
+        // absolute path - don't do anything to it
+        return strdup(path);
+    } else {
+        char *out = malloc(512);
+        snprintf(out, 512, "%s/%s", path_prefix, path);
+        return out;
+    }
+}
+
 static int on_string(struct LaxJsonContext *json, enum LaxJsonType type,
         const char *value, int length)
 {
@@ -127,6 +136,8 @@ static int on_string(struct LaxJsonContext *json, enum LaxJsonType type,
         case StateTopLevelProp:
             if (strcmp(value, "textures") == 0) {
                 state = StateTextures;
+            } else if (strcmp(value, "files") == 0) {
+                state = StateExpectFilesObject;
             } else {
                 snprintf(strbuf, sizeof(strbuf), "unknown top level property: %s", value);
                 return parse_error(strbuf);
@@ -136,7 +147,7 @@ static int on_string(struct LaxJsonContext *json, enum LaxJsonType type,
             return parse_error("expected textures to be an object, not string");
         case StateTextureName:
             page = rucksack_page_create();
-            page_key = mystrdup(value);
+            page_key = strdup(value);
             state = StateExpectTextureObject;
             break;
         case StateExpectImagesObject:
@@ -144,11 +155,23 @@ static int on_string(struct LaxJsonContext *json, enum LaxJsonType type,
         case StateImageName:
             image.anchor = RuckSackAnchorCenter;
             image.path = NULL;
-            image_key = mystrdup(value);
+            image_key = strdup(value);
             state = StateImageObjectBegin;
+            break;
+        case StateFileName:
+            file_key = strdup(value);
+            state = StateFileObjectBegin;
             break;
         case StateImageObjectBegin:
             return parse_error("expected image properties object, not string");
+        case StateFilePropName:
+            if (strcmp(value, "path") == 0) {
+                state = StateFilePropPath;
+            } else {
+                snprintf(strbuf, sizeof(strbuf), "unknown file property: %s", value);
+                return parse_error(strbuf);
+            }
+            break;
         case StateImagePropName:
             if (strcmp(value, "anchor") == 0) {
                 state = StateImagePropAnchor;
@@ -197,8 +220,12 @@ static int on_string(struct LaxJsonContext *json, enum LaxJsonType type,
         case StateImagePropAnchorX:
         case StateImagePropAnchorY:
             return parse_error("expected number");
+        case StateFilePropPath:
+            file_path = resolve_path(value);
+            state = StateFilePropName;
+            break;
         case StateImagePropPath:
-            image.path = mystrdup(value);
+            image.path = resolve_path(value);
             state = StateImagePropName;
             break;
         case StateTextureProp:
@@ -335,6 +362,12 @@ static int on_begin(struct LaxJsonContext *json, enum LaxJsonType type) {
             }
             state = StateImagePropName;
             break;
+        case StateFileObjectBegin:
+            if (type == LaxJsonTypeArray) {
+                return parse_error("expected file object, not array");
+            }
+            state = StateFilePropName;
+            break;
         case StateImagePropAnchor:
             if (type == LaxJsonTypeArray) {
                 return parse_error("expected object or string, not array");
@@ -347,6 +380,11 @@ static int on_begin(struct LaxJsonContext *json, enum LaxJsonType type) {
             return parse_error("expected number");
         case StateImagePropPath:
             return parse_error("expected string");
+        case StateExpectFilesObject:
+            if (type == LaxJsonTypeArray)
+                return parse_error("expected files object, not array");
+            state = StateFileName;
+            break;
         default:
             return parse_error("unexpected array or object");
     }
@@ -375,6 +413,16 @@ static int on_end(struct LaxJsonContext *json, enum LaxJsonType type) {
 
             state = StateImageName;
             break;
+        case StateFilePropName:
+            rucksack_bundle_add_file(bundle, file_key, file_path);
+
+            free(file_path);
+            file_path = NULL;
+            free(file_key);
+            file_key = NULL;
+
+            state = StateFileName;
+            break;
         case StateImagePropAnchorObject:
             state = StateImagePropName;
             break;
@@ -401,10 +449,18 @@ static int on_end(struct LaxJsonContext *json, enum LaxJsonType type) {
     return 0;
 }
 
+static int usage(char *arg0) {
+    fprintf(stderr, "Usage: %s assetsfile bundlefile\n"
+            "\n"
+            "Options:\n"
+            "  [--prefix path]  assets are loaded relative to this path. defaults to cwd\n"
+            , arg0);
+    return 1;
+}
+
 int main(int argc, char *argv[]) {
     char *input_filename = NULL;
-    char *out_dir = ".";
-    char *out_format = "json";
+    char *bundle_filename = NULL;
 
     for (int i = 1; i < argc; i += 1) {
         char *arg = argv[i];
@@ -412,15 +468,15 @@ int main(int argc, char *argv[]) {
             arg += 2;
             if (i + 1 >= argc) {
                 return usage(argv[0]);
-            } else if (strcmp(arg, "dir") == 0) {
-                out_dir = argv[++i];
-            } else if (strcmp(arg, "format") == 0) {
-                out_format = argv[++i];
+            } else if (strcmp(arg, "prefix") == 0) {
+                path_prefix = argv[++i];
             } else {
                 return usage(argv[0]);
             }
         } else if (!input_filename) {
             input_filename = arg;
+        } else if (!bundle_filename) {
+            bundle_filename = arg;
         } else {
             return usage(argv[0]);
         }
@@ -441,13 +497,10 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    printf("out format: %s\n", out_format);
-    printf("out dir: %s\n", out_dir);
-
     rucksack_init();
     atexit(rucksack_finish);
 
-    bundle = rucksack_bundle_open("test.bundle");
+    bundle = rucksack_bundle_open(bundle_filename);
 
     json = lax_json_create();
     json->string = on_string;

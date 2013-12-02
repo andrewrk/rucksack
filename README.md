@@ -8,16 +8,16 @@ format, detailed at the end of this readme.)
 ## Command Line Usage
 
 ```
-rucksack assetsfile bundlefile
+rucksack v0.0.0
 
-Options:
-  --prefix path        assets are loaded relative to this path. defaults to cwd
+Usage: rucksack [command] [command-options]
+
+Commands:
+  help       get info on how to use a command
+  bundle     parses an assets json file and keeps a bundle up to date
+  extract    extracts a single file from the bundle and writes it to stdout
+  list       lists all resources in a bundle
 ```
-
-Parses assetsfile and performs these functions:
-
- * packs multiple images into textures and creates texture atlases for them
- * saves files into the bundle for later extraction
 
 ## Library Usage
 

@@ -95,9 +95,14 @@ int rucksack_bundle_del(struct RuckSackBundle *bundle, const char *key);
 int rucksack_page_add_image(struct RuckSackPage *page, const char *key,
         struct RuckSackImage *image);
 
+size_t rucksack_bundle_file_count(struct RuckSackBundle *bundle);
+void rucksack_bundle_get_files(struct RuckSackBundle *bundle,
+        struct RuckSackFileEntry **entries);
+
 struct RuckSackFileEntry *rucksack_bundle_find_file(
         struct RuckSackBundle *bundle, const char *key);
 size_t rucksack_file_size(struct RuckSackFileEntry *entry);
+const char *rucksack_file_name(struct RuckSackFileEntry *entry);
 int rucksack_bundle_file_read(struct RuckSackBundle *bundle,
         struct RuckSackFileEntry *entry, unsigned char *buffer);
 

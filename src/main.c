@@ -647,6 +647,65 @@ static int help_usage(char *arg0) {
     return 1;
 }
 
+static int list_usage(char *arg0) {
+    fprintf(stderr, "Usage: %s list bundlefile\n"
+            , arg0);
+    return 1;
+}
+
+static int command_list(char *arg0, int argc, char *argv[]) {
+    char *bundle_filename = NULL;
+
+    for (int i = 0; i < argc; i += 1) {
+        char *arg = argv[i];
+        if (arg[0] == '-' && arg[1] == '-') {
+            return list_usage(arg0);
+        } else if (!bundle_filename) {
+            bundle_filename = arg;
+        } else {
+            return list_usage(arg0);
+        }
+    }
+
+    if (!bundle_filename)
+        return list_usage(arg0);
+
+    rucksack_init();
+    atexit(rucksack_finish);
+
+    int rs_err = rucksack_bundle_open(bundle_filename, &bundle);
+    if (rs_err) {
+        print_rs_error(rs_err);
+        return 1;
+    }
+
+    size_t count = rucksack_bundle_file_count(bundle);
+
+    struct RuckSackFileEntry **entries = malloc(count * sizeof(struct RuckSackFileEntry *));
+
+    if (!entries) {
+        fprintf(stderr, "out of memory\n");
+        return 1;
+    }
+
+    rucksack_bundle_get_files(bundle, entries);
+
+    for (int i = 0; i < count; i += 1) {
+        struct RuckSackFileEntry *e = entries[i];
+        printf("%s\n", rucksack_file_name(e));
+    }
+
+    free(entries);
+
+    rs_err = rucksack_bundle_close(bundle);
+    if (rs_err) {
+        print_rs_error(rs_err);
+        return 1;
+    }
+
+    return 0;
+}
+
 struct Command {
     const char *name;
     int (*exec)(char *arg0, int agc, char *argv[]);
@@ -656,12 +715,14 @@ struct Command {
 
 static int command_help(char *arg0, int argc, char *argv[]);
 static struct Command commands[] = {
+    {"help", command_help, help_usage,
+        "get info on how to use a command"},
     {"bundle", command_bundle, bundle_usage,
         "parses an assets json file and keeps a bundle up to date"},
     {"extract", command_extract, extract_usage,
         "extracts a single file from the bundle and writes it to stdout"},
-    {"help", command_help, help_usage,
-        "get info on how to use a command"},
+    {"list", command_list, list_usage,
+        "lists all resources in a bundle"},
     {NULL, NULL, NULL},
 };
 

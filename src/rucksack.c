@@ -1159,8 +1159,12 @@ struct RuckSackFileEntry *rucksack_bundle_find_file(struct RuckSackBundle *bundl
     return find_file_entry(b, key);
 }
 
-size_t rucksack_file_size(struct RuckSackFileEntry *file) {
-    return file->size;
+size_t rucksack_file_size(struct RuckSackFileEntry *entry) {
+    return entry->size;
+}
+
+const char *rucksack_file_name(struct RuckSackFileEntry *entry) {
+    return entry->key;
 }
 
 int rucksack_bundle_file_read(struct RuckSackBundle *bundle, struct RuckSackFileEntry *e,
@@ -1178,4 +1182,18 @@ void rucksack_version(int *major, int *minor, int *patch) {
     if (major) *major = RUCKSACK_VERSION_MAJOR;
     if (minor) *minor = RUCKSACK_VERSION_MINOR;
     if (patch) *patch = RUCKSACK_VERSION_PATCH;
+}
+
+size_t rucksack_bundle_file_count(struct RuckSackBundle *bundle) {
+    struct RuckSackBundlePrivate *b = (struct RuckSackBundlePrivate *) bundle;
+    return b->header_entry_count;
+}
+
+void rucksack_bundle_get_files(struct RuckSackBundle *bundle,
+        struct RuckSackFileEntry **entries)
+{
+    struct RuckSackBundlePrivate *b = (struct RuckSackBundlePrivate *) bundle;
+    for (int i = 0; i < b->header_entry_count; i += 1) {
+        entries[i] = &b->entries[i];
+    }
 }

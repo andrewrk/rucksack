@@ -1,3 +1,10 @@
+/*
+ * Copyright (c) 2013 Andrew Kelley
+ *
+ * This file is part of rucksack, which is MIT licensed.
+ * See http://opensource.org/licenses/MIT
+ */
+
 #include <rucksack.h>
 #include <stdio.h>
 #include <assert.h>

@@ -1,7 +1,19 @@
+/*
+ * Copyright (c) 2013 Andrew Kelley
+ *
+ * This file is part of rucksack, which is MIT licensed.
+ * See http://opensource.org/licenses/MIT
+ */
+
 #ifndef RUCKSACK_H_INCLUDED
 #define RUCKSACK_H_INCLUDED
 
 #include <stdlib.h>
+
+#ifdef __cplusplus
+extern "C"
+{
+#endif /* __cplusplus */
 
 enum RuckSackError {
     RuckSackErrorNone,
@@ -95,5 +107,9 @@ void rucksack_page_get_image(struct RuckSackPage *page, const char *key,
 int rucksack_stream_write(struct RuckSackOutStream *stream, const void *ptr,
         size_t count);
 void rucksack_stream_close(struct RuckSackOutStream *stream);
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif /* RUCKSACK_H_INCLUDED */

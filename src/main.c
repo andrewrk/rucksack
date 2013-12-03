@@ -565,8 +565,8 @@ static int bundle_usage(char *arg0) {
     return 1;
 }
 
-static int extract_usage(char *arg0) {
-    fprintf(stderr, "Usage: %s extract bundlefile resourcename\n"
+static int cat_usage(char *arg0) {
+    fprintf(stderr, "Usage: %s cat bundlefile resourcename\n"
             , arg0);
     return 1;
 }
@@ -657,28 +657,28 @@ static int command_bundle(char *arg0, int argc, char *argv[]) {
     return 0;
 }
 
-static int command_extract(char *arg0, int argc, char *argv[]) {
+static int command_cat(char *arg0, int argc, char *argv[]) {
     char *bundle_filename = NULL;
     char *resource_name = NULL;
 
     for (int i = 0; i < argc; i += 1) {
         char *arg = argv[i];
         if (arg[0] == '-' && arg[1] == '-') {
-            return extract_usage(arg0);
+            return cat_usage(arg0);
         } else if (!bundle_filename) {
             bundle_filename = arg;
         } else if (!resource_name) {
             resource_name = arg;
         } else {
-            return extract_usage(arg0);
+            return cat_usage(arg0);
         }
     }
 
     if (!bundle_filename)
-        return extract_usage(arg0);
+        return cat_usage(arg0);
 
     if (!resource_name)
-        return extract_usage(arg0);
+        return cat_usage(arg0);
 
     rucksack_init();
     atexit(rucksack_finish);
@@ -798,9 +798,9 @@ static struct Command commands[] = {
         "get info on how to use a command"},
     {"bundle", command_bundle, bundle_usage,
         "parses an assets json file and keeps a bundle up to date"},
-    {"extract", command_extract, extract_usage,
+    {"cat", command_cat, cat_usage,
         "extracts a single file from the bundle and writes it to stdout"},
-    {"list", command_list, list_usage,
+    {"ls", command_list, list_usage,
         "lists all resources in a bundle"},
     {NULL, NULL, NULL},
 };

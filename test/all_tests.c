@@ -184,6 +184,7 @@ int main(int argc, char *argv[]) {
     if (argc == 2) {
         int index = atoi(argv[1]);
         exec_test(&tests[index]);
+        return 0;
     }
 
     struct Test *test = &tests[0];

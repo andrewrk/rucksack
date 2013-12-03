@@ -231,6 +231,8 @@ static int on_string(struct LaxJsonContext *json, enum LaxJsonType type,
             return parse_error("expected textures to be an object, not string");
         case StateTextureName:
             page = rucksack_page_create();
+            if (!page)
+                return parse_error("out of memory");
             page_key = strdup(value);
             state = StateExpectTextureObject;
             break;
@@ -494,7 +496,11 @@ static int on_end(struct LaxJsonContext *json, enum LaxJsonType type) {
         case StateDone:
             return parse_error("unexpected content after EOF");
         case StateImagePropName:
-            rucksack_page_add_image(page, image_key, &image);
+            err = rucksack_page_add_image(page, image_key, &image);
+            if (err) {
+                snprintf(strbuf, sizeof(strbuf), "unable to add image to page: %s", RS_ERROR_STR[err]);
+                return parse_error(strbuf);
+            }
 
             free(image.path);
             image.path = NULL;

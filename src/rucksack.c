@@ -22,7 +22,19 @@
 #define MAX(x, y) ((x) > (y) ? (x) : (y))
 #define MIN(x, y) ((x) < (y) ? (x) : (y))
 
-const char *BUNDLE_UUID = "\x60\x70\xc8\x99\x82\xa1\x41\x84\x89\x51\x08\xc9\x1c\xc9\xb6\x20";
+static const char *BUNDLE_UUID = "\x60\x70\xc8\x99\x82\xa1\x41\x84\x89\x51\x08\xc9\x1c\xc9\xb6\x20";
+
+static const char *ERROR_STR[] = {
+    "",
+    "out of memory",
+    "problem accessing file",
+    "invalid bundle format",
+    "invalid anchor enum value",
+    "cannot fit all images into page",
+    "image has no pixels",
+    "unrecognized image format",
+    "key not found",
+};
 
 struct RuckSackFileEntry {
     long int offset;
@@ -1198,4 +1210,8 @@ void rucksack_bundle_get_files(struct RuckSackBundle *bundle,
     for (int i = 0; i < b->header_entry_count; i += 1) {
         entries[i] = &b->entries[i];
     }
+}
+
+const char *rucksack_err_str(int err) {
+    return ERROR_STR[err];
 }

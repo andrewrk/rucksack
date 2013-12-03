@@ -75,6 +75,8 @@ void rucksack_finish(void);
 
 void rucksack_version(int *major, int *minor, int *patch);
 
+const char *rucksack_err_str(int err);
+
 int rucksack_bundle_open(const char *bundle_path, struct RuckSackBundle **bundle);
 int rucksack_bundle_close(struct RuckSackBundle *bundle);
 

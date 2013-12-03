@@ -136,18 +136,6 @@ static const char *JSON_TYPE_STR[] = {
     "Null",
 };
 
-static const char *RS_ERROR_STR[] = {
-    "",
-    "out of memory",
-    "problem accessing file",
-    "invalid bundle format",
-    "invalid anchor enum value",
-    "cannot fit all images into page",
-    "image has no pixels",
-    "unrecognized image format",
-    "key not found",
-};
-
 static int parse_error(const char *msg) {
     if (parse_err_occurred)
         return -1;
@@ -195,7 +183,7 @@ static int glob_insert_files(void) {
         snprintf(strbuf, sizeof(strbuf), "%s%s", glob_prefix, strbuf2);
         err = rucksack_bundle_add_file(bundle, strbuf, path);
         if (err) {
-            snprintf(strbuf, sizeof(strbuf), "unable to add %s: %s", path, RS_ERROR_STR[err]);
+            snprintf(strbuf, sizeof(strbuf), "unable to add %s: %s", path, rucksack_err_str(err));
             return parse_error(strbuf);
         }
     }
@@ -498,7 +486,7 @@ static int on_end(struct LaxJsonContext *json, enum LaxJsonType type) {
         case StateImagePropName:
             err = rucksack_page_add_image(page, image_key, &image);
             if (err) {
-                snprintf(strbuf, sizeof(strbuf), "unable to add image to page: %s", RS_ERROR_STR[err]);
+                snprintf(strbuf, sizeof(strbuf), "unable to add image to page: %s", rucksack_err_str(err));
                 return parse_error(strbuf);
             }
 
@@ -512,7 +500,7 @@ static int on_end(struct LaxJsonContext *json, enum LaxJsonType type) {
         case StateFilePropName:
             err = rucksack_bundle_add_file(bundle, file_key, file_path);
             if (err) {
-                snprintf(strbuf, sizeof(strbuf), "unable to add file: %s", RS_ERROR_STR[err]);
+                snprintf(strbuf, sizeof(strbuf), "unable to add file: %s", rucksack_err_str(err));
                 return parse_error(strbuf);
             }
 
@@ -532,7 +520,7 @@ static int on_end(struct LaxJsonContext *json, enum LaxJsonType type) {
         case StateTextureProp:
             err = rucksack_bundle_add_page(bundle, page_key, page);
             if (err) {
-                snprintf(strbuf, sizeof(strbuf), "unable to add page: %s", RS_ERROR_STR[err]);
+                snprintf(strbuf, sizeof(strbuf), "unable to add page: %s", rucksack_err_str(err));
                 return parse_error(strbuf);
             }
 
@@ -624,7 +612,7 @@ static int command_bundle(char *arg0, int argc, char *argv[]) {
 
     int rs_err = rucksack_bundle_open(bundle_filename, &bundle);
     if (rs_err) {
-        fprintf(stderr, "unable to open bundle %s\n", RS_ERROR_STR[rs_err]);
+        fprintf(stderr, "unable to open bundle %s\n", rucksack_err_str(rs_err));
         return 1;
     }
 
@@ -657,7 +645,7 @@ static int command_bundle(char *arg0, int argc, char *argv[]) {
 
     rs_err = rucksack_bundle_close(bundle);
     if (rs_err) {
-        fprintf(stderr, "unable to close bundle: %s\n", RS_ERROR_STR[rs_err]);
+        fprintf(stderr, "unable to close bundle: %s\n", rucksack_err_str(rs_err));
         return 1;
     }
 
@@ -692,7 +680,7 @@ static int command_cat(char *arg0, int argc, char *argv[]) {
 
     int rs_err = rucksack_bundle_open(bundle_filename, &bundle);
     if (rs_err) {
-        fprintf(stderr, "unable to open bundle: %s\n", RS_ERROR_STR[rs_err]);
+        fprintf(stderr, "unable to open bundle: %s\n", rucksack_err_str(rs_err));
         return 1;
     }
 
@@ -707,7 +695,7 @@ static int command_cat(char *arg0, int argc, char *argv[]) {
     rs_err = rucksack_bundle_file_read(bundle, entry, buffer);
 
     if (rs_err) {
-        fprintf(stderr, "unable to read file entry: %s\n", RS_ERROR_STR[rs_err]);
+        fprintf(stderr, "unable to read file entry: %s\n", rucksack_err_str(rs_err));
         return 1;
     }
 
@@ -720,7 +708,7 @@ static int command_cat(char *arg0, int argc, char *argv[]) {
 
     rs_err = rucksack_bundle_close(bundle);
     if (rs_err) {
-        fprintf(stderr, "unable to close bundle: %s\n", RS_ERROR_STR[rs_err]);
+        fprintf(stderr, "unable to close bundle: %s\n", rucksack_err_str(rs_err));
         return 1;
     }
 
@@ -761,7 +749,7 @@ static int command_list(char *arg0, int argc, char *argv[]) {
 
     int rs_err = rucksack_bundle_open(bundle_filename, &bundle);
     if (rs_err) {
-        fprintf(stderr, "unable to open bundle: %s\n", RS_ERROR_STR[rs_err]);
+        fprintf(stderr, "unable to open bundle: %s\n", rucksack_err_str(rs_err));
         return 1;
     }
 
@@ -785,7 +773,7 @@ static int command_list(char *arg0, int argc, char *argv[]) {
 
     rs_err = rucksack_bundle_close(bundle);
     if (rs_err) {
-        fprintf(stderr, "unable to close bundle: %s\n", RS_ERROR_STR[rs_err]);
+        fprintf(stderr, "unable to close bundle: %s\n", rucksack_err_str(rs_err));
         return 1;
     }
 

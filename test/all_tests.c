@@ -154,8 +154,8 @@ static void test_three_files(void) {
     ok(rucksack_bundle_open(bundle_name, &bundle));
 
     ok(rucksack_bundle_add_file(bundle, "blah", "../test/blah.txt"));
-    ok(rucksack_bundle_add_file(bundle, "g_globby1.txt", "../test/globby1.txt"));
-    ok(rucksack_bundle_add_file(bundle, "g_globby2.txt", "../test/globby2.txt"));
+    ok(rucksack_bundle_add_file(bundle, "g_globby1.txt", "../test/globby/globby1.txt"));
+    ok(rucksack_bundle_add_file(bundle, "g_globby2.txt", "../test/globby/globby2.txt"));
 
     ok(rucksack_bundle_close(bundle));
 }

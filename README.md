@@ -64,7 +64,8 @@ int main() {
   // if you want to avoid manually specifying every file, you can glob
   globFiles: [
     {
-      glob: "path/to/*",
+      path: "path/to/dir",
+      glob: "*",
       prefix: "abc_", // prepended to the key
     },
   ],

@@ -48,9 +48,11 @@ set(LIB_HEADERS
   )
 set(EXE_SOURCES
   ${PROJECT_SOURCE_DIR}/src/main.c
+  ${PROJECT_SOURCE_DIR}/src/path.c
   )
 set(EXE_HEADERS
   ${PROJECT_SOURCE_DIR}/src/rucksack.h
+  ${PROJECT_SOURCE_DIR}/src/path.h
   )
 
 set(LIB_CFLAGS "${C99_C_FLAGS} -pedantic -Werror -Wall -Werror=strict-prototypes -Werror=old-style-definition -Werror=missing-prototypes -D_POSIX_C_SOURCE=200809L")
@@ -88,6 +90,11 @@ set_target_properties(all_tests PROPERTIES
   COMPILE_FLAGS ${EXE_CFLAGS})
 target_link_libraries(all_tests rucksack_shared)
 add_test(AllTests all_tests)
+
+add_executable(test_path test/test_path.c src/path.c src/path.h)
+set_target_properties(test_path PROPERTIES
+  COMPILE_FLAGS ${EXE_CFLAGS})
+add_test(PathUnitTests test_path)
 
 message("\n"
 "Installation Summary\n"

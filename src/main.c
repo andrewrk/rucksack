@@ -16,6 +16,7 @@
 #include <laxjson.h>
 
 #include "rucksack.h"
+#include "path.h"
 
 struct RuckSackBundle *bundle;
 static char buffer[16384];
@@ -51,6 +52,7 @@ enum State {
     StateGlobObjectProp,
     StateGlobValueGlob,
     StateGlobValuePrefix,
+    StateGlobValuePath,
 };
 
 static const char *STATE_STR[] = {
@@ -83,11 +85,14 @@ static const char *STATE_STR[] = {
     "StateGlobObjectProp",
     "StateGlobValueGlob",
     "StateGlobValuePrefix",
+    "StateGlobValuePath",
 };
 
 static enum State state;
 static char parse_err_occurred = 0;
-static char strbuf[1024];
+static char strbuf[2048];
+static char strbuf2[2048];
+static char strbuf3[2048];
 
 static struct RuckSackPage *page = NULL;
 static char *page_key = NULL;
@@ -101,6 +106,7 @@ static char *image_key = NULL;
 static char *path_prefix = ".";
 
 static char *glob_glob = NULL;
+static char *glob_path = NULL;
 static char *glob_prefix = NULL;
 
 static char debug_mode = 0;
@@ -152,19 +158,16 @@ static int parse_error(const char *msg) {
 }
 
 static char *resolve_path(const char *path) {
-    if (path[0] == '/') {
-        // absolute path - don't do anything to it
-        return strdup(path);
-    } else {
-        char *out = malloc(1024);
-        snprintf(out, 1024, "%s/%s", path_prefix, path);
-        return out;
-    }
+    char *out = malloc(2048);
+    path_resolve(path_prefix, path, out);
+    return out;
 }
 
 static int glob_insert_files(void) {
     glob_t glob_result;
-    int err = glob(glob_glob, GLOB_NOSORT, NULL, &glob_result);
+    path_join(path_prefix, glob_path, strbuf3);
+    path_join(strbuf3, glob_glob, strbuf2);
+    int err = glob(strbuf2, GLOB_NOSORT, NULL, &glob_result);
 
     switch (err) {
         case GLOB_NOSPACE:
@@ -187,18 +190,9 @@ static int glob_insert_files(void) {
             continue;
 
         // compute a relative path so we can use it to build the key
-        char *relative_path = path;
-        int path_prefix_size = strlen(path_prefix);
-        if (strlen(relative_path) > path_prefix_size &&
-            memcmp(relative_path, path_prefix, path_prefix_size) == 0)
-        {
-            relative_path += path_prefix_size;
-            while (relative_path[0] == '/') {
-                relative_path += 1;
-            }
-        }
+        path_relative(strbuf3, path, strbuf2);
 
-        snprintf(strbuf, sizeof(strbuf), "%s%s", glob_prefix, relative_path);
+        snprintf(strbuf, sizeof(strbuf), "%s%s", glob_prefix, strbuf2);
         err = rucksack_bundle_add_file(bundle, strbuf, path);
         if (err) {
             snprintf(strbuf, sizeof(strbuf), "unable to add %s: %s", path, RS_ERROR_STR[err]);
@@ -337,13 +331,19 @@ static int on_string(struct LaxJsonContext *json, enum LaxJsonType type,
                 state = StateGlobValueGlob;
             } else if (strcmp(value, "prefix") == 0) {
                 state = StateGlobValuePrefix;
+            } else if (strcmp(value, "path") == 0) {
+                state = StateGlobValuePath;
             } else {
                 snprintf(strbuf, sizeof(strbuf), "unknown glob property: %s", value);
                 return parse_error(strbuf);
             }
             break;
         case StateGlobValueGlob:
-            glob_glob = resolve_path(value);
+            glob_glob = strdup(value);
+            state = StateGlobObjectProp;
+            break;
+        case StateGlobValuePath:
+            glob_path = strdup(value);
             state = StateGlobObjectProp;
             break;
         case StateGlobValuePrefix:
@@ -469,6 +469,7 @@ static int on_begin(struct LaxJsonContext *json, enum LaxJsonType type) {
             case StateGlobObject:
                 state = StateGlobObjectProp;
                 glob_glob = NULL;
+                glob_path = NULL;
                 glob_prefix = NULL;
                 break;
             default:

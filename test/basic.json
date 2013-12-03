@@ -8,7 +8,8 @@
   },
   globFiles: [
     {
-      glob: "globby*",
+      path: "globby",
+      glob: "*",
       prefix: "g_",
     },
   ],

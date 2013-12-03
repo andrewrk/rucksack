@@ -8,8 +8,6 @@
 #ifndef RUCKSACK_H_INCLUDED
 #define RUCKSACK_H_INCLUDED
 
-#include <stdlib.h>
-
 #ifdef __cplusplus
 extern "C"
 {
@@ -89,24 +87,24 @@ int rucksack_bundle_add_file(struct RuckSackBundle *bundle, const char *key,
         const char *file_name);
 
 int rucksack_bundle_add_stream(struct RuckSackBundle *bundle, const char *key,
-        size_t size_guess, struct RuckSackOutStream **stream);
+        long int size_guess, struct RuckSackOutStream **stream);
 
 int rucksack_page_add_image(struct RuckSackPage *page, const char *key,
         struct RuckSackImage *image);
 
-size_t rucksack_bundle_file_count(struct RuckSackBundle *bundle);
+long int rucksack_bundle_file_count(struct RuckSackBundle *bundle);
 void rucksack_bundle_get_files(struct RuckSackBundle *bundle,
         struct RuckSackFileEntry **entries);
 
 struct RuckSackFileEntry *rucksack_bundle_find_file(
         struct RuckSackBundle *bundle, const char *key);
-size_t rucksack_file_size(struct RuckSackFileEntry *entry);
+long int rucksack_file_size(struct RuckSackFileEntry *entry);
 const char *rucksack_file_name(struct RuckSackFileEntry *entry);
 int rucksack_bundle_file_read(struct RuckSackBundle *bundle,
         struct RuckSackFileEntry *entry, unsigned char *buffer);
 
 int rucksack_stream_write(struct RuckSackOutStream *stream, const void *ptr,
-        size_t count);
+        long int count);
 void rucksack_stream_close(struct RuckSackOutStream *stream);
 
 #ifdef __cplusplus

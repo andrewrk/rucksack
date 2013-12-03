@@ -103,7 +103,7 @@ static char *path_prefix = ".";
 static char *glob_glob = NULL;
 static char *glob_prefix = NULL;
 
-static char debug_mode = 1;
+static char debug_mode = 0;
 
 static const char *ERR_STR[] = {
     "",

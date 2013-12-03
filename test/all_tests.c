@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <assert.h>
 #include <string.h>
+#include <stdlib.h>
 
 static const char *RS_ERROR_STR[] = {
     "",
@@ -173,13 +174,22 @@ static struct Test tests[] = {
     {NULL, NULL},
 };
 
+static void exec_test(struct Test *test) {
+    fprintf(stderr, "testing %s...", test->name);
+    test->fn();
+    fprintf(stderr, "OK\n");
+}
+
 int main(int argc, char *argv[]) {
+    if (argc == 2) {
+        int index = atoi(argv[1]);
+        exec_test(&tests[index]);
+    }
+
     struct Test *test = &tests[0];
 
     while (test->name) {
-        fprintf(stderr, "testing %s...", test->name);
-        test->fn();
-        fprintf(stderr, "OK\n");
+        exec_test(test);
         test += 1;
     }
 

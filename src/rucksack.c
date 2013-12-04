@@ -98,7 +98,6 @@ struct RuckSackPagePrivate {
 struct RuckSackOutStream {
     struct RuckSackBundlePrivate *b;
     struct RuckSackFileEntry *e;
-    long int pos;
 };
 
 static long int alloc_size(long int actual_size) {
@@ -1031,13 +1030,17 @@ int rucksack_bundle_add_file(struct RuckSackBundle *bundle, const char *key,
     const int buf_size = 16384;
     char *buffer = malloc(buf_size);
 
-    if (!buffer)
+    if (!buffer) {
+        fclose(f);
+        rucksack_stream_close(stream);
         return RuckSackErrorNoMem;
+    }
 
     long int amt_read;
     while ((amt_read = fread(buffer, 1, buf_size, f))) {
         int err = rucksack_stream_write(stream, buffer, amt_read);
         if (err) {
+            fclose(f);
             free(buffer);
             rucksack_stream_close(stream);
             return err;
@@ -1145,7 +1148,8 @@ void rucksack_stream_close(struct RuckSackOutStream *stream) {
 int rucksack_stream_write(struct RuckSackOutStream *stream, const void *ptr,
         long int count)
 {
-    long int end = stream->pos + count;
+    long int pos = stream->e->size;
+    long int end = pos + count;
     if (end > stream->e->allocated_size) {
         // It didn't fit. Move this stream to a new one with extra padding
         long int new_size = alloc_size(end);
@@ -1156,13 +1160,13 @@ int rucksack_stream_write(struct RuckSackOutStream *stream, const void *ptr,
 
     FILE *f = stream->b->f;
 
-    if (fseek(f, stream->e->offset + stream->pos, SEEK_SET))
+    if (fseek(f, stream->e->offset + pos, SEEK_SET))
         return RuckSackErrorFileAccess;
 
     if (fwrite(ptr, 1, count, stream->b->f) != count)
         return RuckSackErrorFileAccess;
 
-    stream->e->size += count;
+    stream->e->size = pos + count;
 
     return RuckSackErrorNone;
 }

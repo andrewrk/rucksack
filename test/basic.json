@@ -12,6 +12,9 @@
       glob: "*",
       prefix: "g_",
     },
+    {
+      glob: "*.obj",
+    },
   ],
   textures: {
     cockpit: {

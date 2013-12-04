@@ -11,21 +11,9 @@
 #include <string.h>
 #include <stdlib.h>
 
-static const char *RS_ERROR_STR[] = {
-    "",
-    "out of memory",
-    "problem accessing file",
-    "invalid bundle format",
-    "invalid anchor enum value",
-    "cannot fit all images into page",
-    "image has no pixels",
-    "unrecognized image format",
-    "key not found",
-};
-
 static void ok(int err) {
     if (!err) return;
-    fprintf(stderr, "Error: %s\n", RS_ERROR_STR[err]);
+    fprintf(stderr, "Error: %s\n", rucksack_err_str(err));
     assert(0);
 }
 
@@ -160,6 +148,33 @@ static void test_three_files(void) {
     ok(rucksack_bundle_close(bundle));
 }
 
+static void test_16kb_file(void) {
+    const char *bundle_name = "test.bundle";
+    remove(bundle_name);
+
+    struct RuckSackBundle *bundle;
+    ok(rucksack_bundle_open(bundle_name, &bundle));
+    ok(rucksack_bundle_add_file(bundle, "monkey.obj", "../test/monkey.obj"));
+    ok(rucksack_bundle_close(bundle));
+
+    ok(rucksack_bundle_open(bundle_name, &bundle));
+    struct RuckSackFileEntry *entry = rucksack_bundle_find_file(bundle, "monkey.obj");
+    assert(entry);
+
+    long size = rucksack_file_size(entry);
+    assert(size == 23875);
+
+    unsigned char *buffer = malloc(size);
+    ok(rucksack_bundle_file_read(bundle, entry, buffer));
+
+    assert(buffer[0] == '#');
+    assert(buffer[size - 2] == '1');
+
+    free(buffer);
+
+    ok(rucksack_bundle_close(bundle));
+}
+
 struct Test {
     const char *name;
     void (*fn)(void);
@@ -171,6 +186,7 @@ static struct Test tests[] = {
     {"texture packing", test_texture_packing},
     {"bundling twice", test_bundling_twice},
     {"add 3 files", test_three_files},
+    {"add a file larger than 16KB", test_16kb_file},
     {NULL, NULL},
 };
 

@@ -152,9 +152,13 @@ static char *resolve_path(const char *path) {
 }
 
 static int glob_insert_files(void) {
+    char *use_glob_str = glob_glob ? glob_glob : "*";
+    char *use_glob_path = glob_path ? glob_path : "";
+    char *use_glob_prefix = glob_prefix ? glob_prefix : "";
+
     glob_t glob_result;
-    path_join(path_prefix, glob_path, strbuf3);
-    path_join(strbuf3, glob_glob, strbuf2);
+    path_join(path_prefix, use_glob_path, strbuf3);
+    path_join(strbuf3, use_glob_str, strbuf2);
     int err = glob(strbuf2, GLOB_NOSORT, NULL, &glob_result);
 
     switch (err) {
@@ -180,7 +184,7 @@ static int glob_insert_files(void) {
         // compute a relative path so we can use it to build the key
         path_relative(strbuf3, path, strbuf2);
 
-        snprintf(strbuf, sizeof(strbuf), "%s%s", glob_prefix, strbuf2);
+        snprintf(strbuf, sizeof(strbuf), "%s%s", use_glob_prefix, strbuf2);
         err = rucksack_bundle_add_file(bundle, strbuf, path);
         if (err) {
             snprintf(strbuf, sizeof(strbuf), "unable to add %s: %s", path, rucksack_err_str(err));
@@ -536,6 +540,7 @@ static int on_end(struct LaxJsonContext *json, enum LaxJsonType type) {
             err = glob_insert_files();
             if (err) return err;
             free(glob_glob);
+            free(glob_path);
             free(glob_prefix);
             state = StateGlobObject;
             break;

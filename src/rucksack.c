@@ -46,9 +46,12 @@ struct RuckSackFileEntry {
     char is_open; // flag for when an out stream is writing to this entry
 };
 
-// surprise! a texture struct is merely a file entry with a different name
 struct RuckSackTexture {
-    struct RuckSackFileEntry entry;
+    struct RuckSackFileEntry *entry;
+    long image_count;
+    struct RuckSackImage *images;
+    long pixel_data_offset;
+    long pixel_data_size;
 };
 
 struct RuckSackBundlePrivate {
@@ -237,13 +240,13 @@ static int read_header(struct RuckSackBundlePrivate *b) {
         entry->allocated_size = read_uint64be(&buf[20]);
         entry->key_size = read_uint32be(&buf[28]);
         entry->key = malloc(entry->key_size + 1);
-        entry->b = b;
         if (!entry->key)
             return RuckSackErrorNoMem;
         amt_read = fread(entry->key, 1, entry->key_size, f);
         if (amt_read != entry->key_size)
             return RuckSackErrorInvalidFormat;
         entry->key[entry->key_size] = 0;
+        entry->b = b;
 
         b->headers_byte_count += 32 + entry->key_size;
 
@@ -1303,35 +1306,121 @@ const char *rucksack_err_str(int err) {
 }
 
 int rucksack_file_open_texture(struct RuckSackFileEntry *entry,
-        struct RuckSackTexture **texture)
+        struct RuckSackTexture **out_texture)
 {
-    // TODO
+    *out_texture = NULL;
+
+    struct RuckSackTexture *texture = calloc(1, sizeof(struct RuckSackTexture));
+    if (!texture)
+        return RuckSackErrorNoMem;
+    texture->entry = entry;
+
+    struct RuckSackBundlePrivate *b = entry->b;
+    if (fseek(b->f, entry->offset, SEEK_SET)) {
+        rucksack_texture_close(texture);
+        return RuckSackErrorFileAccess;
+    }
+
+    unsigned char buf[48];
+    long amt_read = fread(buf, 1, 12, b->f);
+    if (amt_read != 12) {
+        rucksack_texture_close(texture);
+        return RuckSackErrorFileAccess;
+    }
+
+    texture->pixel_data_offset = read_uint32be(&buf[0]);
+    texture->pixel_data_size = entry->size - texture->pixel_data_offset;
+    texture->image_count = read_uint32be(&buf[4]);
+    long offset_to_first_img = read_uint32be(&buf[8]);
+
+    texture->images = calloc(texture->image_count, sizeof(struct RuckSackImage));
+
+    if (!texture->images) {
+        rucksack_texture_close(texture);
+        return RuckSackErrorNoMem;
+    }
+
+    long next_offset = entry->offset + offset_to_first_img;
+    for (int i = 0; i < texture->image_count; i += 1) {
+        struct RuckSackImage *image = &texture->images[i];
+        image->anchor = RuckSackAnchorExplicit;
+
+        if (fseek(b->f, next_offset, SEEK_SET)) {
+            rucksack_texture_close(texture);
+            return RuckSackErrorFileAccess;
+        }
+
+        long amt_read = fread(buf, 1, 48, b->f);
+        if (amt_read != 48) {
+            rucksack_texture_close(texture);
+            return RuckSackErrorFileAccess;
+        }
+
+        long this_size = read_uint32be(&buf[0]);
+        next_offset += this_size;
+
+        image->anchor_x = read_uint32be(&buf[4]);
+        image->anchor_y = read_uint32be(&buf[8]);
+
+        for (int j = 0; j < 4; j += 1) {
+            for (int k = 0; k < 2; k += 1) {
+                image->uv_coords[j][k] = read_uint32be(&buf[12 + j * 8 + k * 4]);
+            }
+        }
+
+        long key_size = read_uint32be(&buf[44]);
+        image->name = malloc(key_size + 1);
+        if (!image->name) {
+            rucksack_texture_close(texture);
+            return RuckSackErrorNoMem;
+        }
+        amt_read = fread(image->name, 1, key_size, b->f);
+        if (amt_read != key_size) {
+            rucksack_texture_close(texture);
+            return RuckSackErrorFileAccess;
+        }
+        image->name[key_size] = 0;
+    }
+
+    *out_texture = texture;
     return RuckSackErrorNone;
 }
 
-int rucksack_texture_close(struct RuckSackTexture *texture) {
-    // TODO
-    return RuckSackErrorNone;
+void rucksack_texture_close(struct RuckSackTexture *texture) {
+    if (texture->images) {
+        for (int i = 0; i < texture->image_count; i += 1) {
+            struct RuckSackImage *image = &texture->images[i];
+            if (image->name)
+                free(image->name);
+        }
+        free(texture->images);
+    }
+    free(texture);
 }
 
 long rucksack_texture_size(struct RuckSackTexture *texture) {
-    // TODO
-    return 0;
+    return texture->pixel_data_size;
 }
 
 int rucksack_texture_read(struct RuckSackTexture *texture, unsigned char *buffer) {
-    // TODO
+    struct RuckSackFileEntry *entry = texture->entry;
+    FILE *f = entry->b->f;
+    if (fseek(f, entry->offset + texture->pixel_data_offset, SEEK_SET))
+        return RuckSackErrorFileAccess;
+    long int amt_read = fread(buffer, 1, texture->pixel_data_size, f);
+    if (amt_read != texture->pixel_data_size)
+        return RuckSackErrorFileAccess;
     return RuckSackErrorNone;
 }
 
 long rucksack_texture_image_count(struct RuckSackTexture *texture) {
-    // TODO
-    return 0;
+    return texture->image_count;
 }
 
-int rucksack_texture_get_images(struct RuckSackTexture *texture,
+void rucksack_texture_get_images(struct RuckSackTexture *texture,
         struct RuckSackImage **images)
 {
-    // TODO
-    return RuckSackErrorNone;
+    for (int i = 0; i < texture->image_count; i += 1) {
+        images[i] = &texture->images[i];
+    }
 }

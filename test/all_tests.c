@@ -91,6 +91,21 @@ static void test_texture_packing(void) {
     rucksack_page_destroy(page);
 
     ok(rucksack_bundle_close(bundle));
+
+    // now try to read it
+    ok(rucksack_bundle_open(bundle_name, &bundle));
+
+    struct RuckSackFileEntry *entry = rucksack_bundle_find_file(bundle, "texture_foo");
+    assert(entry);
+
+    struct RuckSackTexture *texture;
+    ok(rucksack_file_open_texture(entry, &texture));
+
+    assert(rucksack_texture_image_count(texture) == 4);
+
+    rucksack_texture_close(texture);
+
+    ok(rucksack_bundle_close(bundle));
 }
 
 static void test_bundling_twice(void) {

@@ -119,7 +119,7 @@ const char *rucksack_file_name(struct RuckSackFileEntry *entry);
 int rucksack_file_read(struct RuckSackFileEntry *entry, unsigned char *buffer);
 
 int rucksack_file_open_texture(struct RuckSackFileEntry *entry, struct RuckSackTexture **texture);
-int rucksack_texture_close(struct RuckSackTexture *texture);
+void rucksack_texture_close(struct RuckSackTexture *texture);
 // get the size of the image data for this texture
 long rucksack_texture_size(struct RuckSackTexture *texture);
 // get the image data for this texture
@@ -127,7 +127,7 @@ int rucksack_texture_read(struct RuckSackTexture *texture, unsigned char *buffer
 
 // image metadata
 long rucksack_texture_image_count(struct RuckSackTexture *texture);
-int rucksack_texture_get_images(struct RuckSackTexture *texture,
+void rucksack_texture_get_images(struct RuckSackTexture *texture,
         struct RuckSackImage **images);
 
 

@@ -49,15 +49,20 @@ enum RuckSackAnchor {
 };
 
 struct RuckSackImage {
-    char *path;
+    // write API: this is the path
+    // read API: this is the key
+    char *name;
     enum RuckSackAnchor anchor;
     int anchor_x;
     int anchor_y;
 
-    unsigned int width;
-    unsigned int height;
-    // triangle strip
-    int uv_coords[10];
+    int width;
+    int height;
+    // triangle strip (4 points, 2 coords each)
+    // 1----3
+    // |    |
+    // 2----4
+    int uv_coords[4][2];
 };
 
 // a page contains multiple images. also known as texture or spritesheet
@@ -70,6 +75,9 @@ struct RuckSackPage {
 
 struct RuckSackOutStream;
 
+struct RuckSackTexture;
+
+/* common API */
 void rucksack_init(void);
 void rucksack_finish(void);
 
@@ -80,6 +88,7 @@ const char *rucksack_err_str(int err);
 int rucksack_bundle_open(const char *bundle_path, struct RuckSackBundle **bundle);
 int rucksack_bundle_close(struct RuckSackBundle *bundle);
 
+/* write API */
 struct RuckSackPage *rucksack_page_create(void);
 void rucksack_page_destroy(struct RuckSackPage *page);
 
@@ -89,25 +98,38 @@ int rucksack_bundle_add_file(struct RuckSackBundle *bundle, const char *key,
         const char *file_name);
 
 int rucksack_bundle_add_stream(struct RuckSackBundle *bundle, const char *key,
-        long int size_guess, struct RuckSackOutStream **stream);
+        long size_guess, struct RuckSackOutStream **stream);
 
 int rucksack_page_add_image(struct RuckSackPage *page, const char *key,
         struct RuckSackImage *image);
 
-long int rucksack_bundle_file_count(struct RuckSackBundle *bundle);
+int rucksack_stream_write(struct RuckSackOutStream *stream, const void *ptr,
+        long count);
+void rucksack_stream_close(struct RuckSackOutStream *stream);
+
+/* read API */
+long rucksack_bundle_file_count(struct RuckSackBundle *bundle);
 void rucksack_bundle_get_files(struct RuckSackBundle *bundle,
         struct RuckSackFileEntry **entries);
 
 struct RuckSackFileEntry *rucksack_bundle_find_file(
         struct RuckSackBundle *bundle, const char *key);
-long int rucksack_file_size(struct RuckSackFileEntry *entry);
+long rucksack_file_size(struct RuckSackFileEntry *entry);
 const char *rucksack_file_name(struct RuckSackFileEntry *entry);
-int rucksack_bundle_file_read(struct RuckSackBundle *bundle,
-        struct RuckSackFileEntry *entry, unsigned char *buffer);
+int rucksack_file_read(struct RuckSackFileEntry *entry, unsigned char *buffer);
 
-int rucksack_stream_write(struct RuckSackOutStream *stream, const void *ptr,
-        long int count);
-void rucksack_stream_close(struct RuckSackOutStream *stream);
+int rucksack_file_open_texture(struct RuckSackFileEntry *entry, struct RuckSackTexture **texture);
+int rucksack_texture_close(struct RuckSackTexture *texture);
+// get the size of the image data for this texture
+long rucksack_texture_size(struct RuckSackTexture *texture);
+// get the image data for this texture
+int rucksack_texture_read(struct RuckSackTexture *texture, unsigned char *buffer);
+
+// image metadata
+long rucksack_texture_image_count(struct RuckSackTexture *texture);
+int rucksack_texture_get_images(struct RuckSackTexture *texture,
+        struct RuckSackImage **images);
+
 
 #ifdef __cplusplus
 }

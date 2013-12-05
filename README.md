@@ -15,8 +15,8 @@ Usage: rucksack [command] [command-options]
 Commands:
   help       get info on how to use a command
   bundle     parses an assets json file and keeps a bundle up to date
-  extract    extracts a single file from the bundle and writes it to stdout
-  list       lists all resources in a bundle
+  cat        extracts a single file from the bundle and writes it to stdout
+  ls         lists all resources in a bundle
 ```
 
 ## Library Usage
@@ -98,6 +98,11 @@ int main() {
 The main header identifies the file and tells you some metadata about the
 rest of the header entries.
 
+The basic data supported by rucksack is a file. In this case the offset that
+a header entry points to is the raw file data. The other format supported
+is a texture, also known as a spritesheet. This is described by Texture Format
+below.
+
     Offset | Contents
     -------+---------
          0 | 16 byte UUID - 60 70 c8 99 82 a1 41 84 89 51 08 c9 1c c9 b6 20
@@ -115,3 +120,22 @@ rest of the header entries.
         28 | uint32be key size in bytes
         32 | key bytes
 
+
+### Texture Format
+
+    Offset | Contents
+    -------+---------
+         0 | uint32be offset of the actual image data from 0 in this struct
+         4 | uint32be number of images in this texture
+         8 | uint32be offset of the first image entry from 0 in this struct
+
+#### Image Entry Format
+
+    Offset | Contents
+    -------+---------
+         0 | uint32be size of this image entry header in bytes
+         4 | uint32be anchor x
+         8 | uint32be anchor y
+        12 | uint32be[8] - triangle strip for this image in pixels
+        44 | uint32be key size in bytes
+        48 | key bytes

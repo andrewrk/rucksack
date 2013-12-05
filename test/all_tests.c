@@ -40,7 +40,7 @@ static void test_write_read(void) {
     assert(size == 10);
 
     char buf[11];
-    ok(rucksack_bundle_file_read(bundle, entry, (unsigned char *)buf));
+    ok(rucksack_file_read(entry, (unsigned char *)buf));
     buf[10] = 0;
     assert(strcmp(buf, "aoeu\n1234\n") == 0);
 
@@ -55,7 +55,7 @@ static void test_write_read(void) {
     assert(size == 10);
 
     memset(buf, 0, 11);
-    ok(rucksack_bundle_file_read(bundle, entry, (unsigned char *)buf));
+    ok(rucksack_file_read(entry, (unsigned char *)buf));
     assert(strcmp(buf, "aoeu\n1234\n") == 0);
 
 
@@ -74,16 +74,16 @@ static void test_texture_packing(void) {
     struct RuckSackImage img;
     img.anchor = RuckSackAnchorCenter;
 
-    img.path = "../test/file0.png";
+    img.name = "../test/file0.png";
     ok(rucksack_page_add_image(page, "image0", &img));
 
-    img.path = "../test/file1.png";
+    img.name = "../test/file1.png";
     ok(rucksack_page_add_image(page, "image1", &img));
 
-    img.path = "../test/file2.png";
+    img.name = "../test/file2.png";
     ok(rucksack_page_add_image(page, "image2", &img));
 
-    img.path = "../test/file3.png";
+    img.name = "../test/file3.png";
     ok(rucksack_page_add_image(page, "image3", &img));
 
     ok(rucksack_bundle_add_page(bundle, "texture_foo", page));
@@ -107,10 +107,10 @@ static void test_bundling_twice(void) {
         struct RuckSackImage img;
         img.anchor = RuckSackAnchorCenter;
 
-        img.path = "../test/radar-circle.png";
+        img.name = "../test/radar-circle.png";
         ok(rucksack_page_add_image(page, "radarCircle", &img));
 
-        img.path = "../test/arrow.png";
+        img.name = "../test/arrow.png";
         ok(rucksack_page_add_image(page, "arrow", &img));
 
         ok(rucksack_bundle_add_page(bundle, "cockpit", page));
@@ -128,7 +128,7 @@ static void test_bundling_twice(void) {
 
     size_t size = rucksack_file_size(entry);
     unsigned char *buffer = malloc(size);
-    ok(rucksack_bundle_file_read(bundle, entry, buffer));
+    ok(rucksack_file_read(entry, buffer));
     free(buffer);
 
     ok(rucksack_bundle_close(bundle));
@@ -165,7 +165,7 @@ static void test_16kb_file(void) {
     assert(size == 23875);
 
     unsigned char *buffer = malloc(size);
-    ok(rucksack_bundle_file_read(bundle, entry, buffer));
+    ok(rucksack_file_read(entry, buffer));
 
     assert(buffer[0] == '#');
     assert(buffer[size - 2] == '1');

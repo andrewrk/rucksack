@@ -232,7 +232,7 @@ static int on_string(struct LaxJsonContext *json, enum LaxJsonType type,
             return parse_error("expected images object, not string");
         case StateImageName:
             image.anchor = RuckSackAnchorCenter;
-            image.path = NULL;
+            image.name = NULL;
             image_key = strdup(value);
             state = StateImageObjectBegin;
             break;
@@ -303,7 +303,7 @@ static int on_string(struct LaxJsonContext *json, enum LaxJsonType type,
             state = StateFilePropName;
             break;
         case StateImagePropPath:
-            image.path = resolve_path(value);
+            image.name = resolve_path(value);
             state = StateImagePropName;
             break;
         case StateTextureProp:
@@ -494,8 +494,8 @@ static int on_end(struct LaxJsonContext *json, enum LaxJsonType type) {
                 return parse_error(strbuf);
             }
 
-            free(image.path);
-            image.path = NULL;
+            free(image.name);
+            image.name = NULL;
             free(image_key);
             image_key = NULL;
 
@@ -697,7 +697,7 @@ static int command_cat(char *arg0, int argc, char *argv[]) {
     size_t size = rucksack_file_size(entry);
     unsigned char *buffer = malloc(size);
 
-    rs_err = rucksack_bundle_file_read(bundle, entry, buffer);
+    rs_err = rucksack_file_read(entry, buffer);
 
     if (rs_err) {
         fprintf(stderr, "unable to read file entry: %s\n", rucksack_err_str(rs_err));

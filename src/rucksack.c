@@ -37,12 +37,18 @@ static const char *ERROR_STR[] = {
 };
 
 struct RuckSackFileEntry {
+    struct RuckSackBundlePrivate *b;
     long int offset;
     long int size;
     long int allocated_size;
     long int key_size;
     char *key;
     char is_open; // flag for when an out stream is writing to this entry
+};
+
+// surprise! a texture struct is merely a file entry with a different name
+struct RuckSackTexture {
+    struct RuckSackFileEntry entry;
 };
 
 struct RuckSackBundlePrivate {
@@ -65,6 +71,7 @@ struct RuckSackImagePrivate {
     struct RuckSackImage externals;
 
     char *key;
+    long key_size;
     FIBITMAP *bmp;
 
     int x;
@@ -230,6 +237,7 @@ static int read_header(struct RuckSackBundlePrivate *b) {
         entry->allocated_size = read_uint64be(&buf[20]);
         entry->key_size = read_uint32be(&buf[28]);
         entry->key = malloc(entry->key_size + 1);
+        entry->b = b;
         if (!entry->key)
             return RuckSackErrorNoMem;
         amt_read = fread(entry->key, 1, entry->key_size, f);
@@ -552,12 +560,12 @@ int rucksack_page_add_image(struct RuckSackPage *page, const char *key,
 {
     struct RuckSackPagePrivate *p = (struct RuckSackPagePrivate *) page;
 
-    FREE_IMAGE_FORMAT fmt = FreeImage_GetFileType(userimg->path, 0);
+    FREE_IMAGE_FORMAT fmt = FreeImage_GetFileType(userimg->name, 0);
 
     if (fmt == FIF_UNKNOWN || !FreeImage_FIFSupportsReading(fmt))
         return RuckSackErrorImageFormat;
 
-    FIBITMAP *bmp = FreeImage_Load(fmt, userimg->path, 0);
+    FIBITMAP *bmp = FreeImage_Load(fmt, userimg->name, 0);
 
     if (!bmp)
         return RuckSackErrorFileAccess;
@@ -628,6 +636,7 @@ int rucksack_page_add_image(struct RuckSackPage *page, const char *key,
     }
 
     i->key = strdup(key);
+    i->key_size = strlen(key);
 
     return RuckSackErrorNone;
 }
@@ -774,7 +783,9 @@ static int do_maxrect_bssf(struct RuckSackPage *page) {
         if (!best_rect)
             return RuckSackErrorCannotFit;
 
-        // place image at top left of this rect
+        // freeimage images are upside down. so, geometrically we are placing
+        // the image at the top left of this rect. However due to freeimage's
+        // inverted Y axis, the image will actually end up in the bottom left.
         struct Rect img_rect;
         img_rect.x = best_rect->x;
         img_rect.y = best_rect->y;
@@ -788,6 +799,35 @@ static int do_maxrect_bssf(struct RuckSackPage *page) {
         // keep track of page boundaries
         p->width = MAX(img->x + img_rect.w, p->width);
         p->height = MAX(img->y + img_rect.h, p->height);
+
+        // calculate texture coordinates for this image
+        // we can't calculate float coordinates until the width and height
+        // of the texture are finalized.
+        if (img->r90) {
+            // 1----0
+            // |    |
+            // 3----2
+            image->uv_coords[0][0] = img->x + image->width;
+            image->uv_coords[0][1] = img->y;
+            image->uv_coords[1][0] = img->x;
+            image->uv_coords[1][1] = img->y;
+            image->uv_coords[2][0] = img->x + image->width;
+            image->uv_coords[2][1] = img->y + image->height;
+            image->uv_coords[3][0] = img->x;
+            image->uv_coords[3][1] = img->y + image->height;
+        } else {
+            // 0----2
+            // |    |
+            // 1----3
+            image->uv_coords[0][0] = img->x;
+            image->uv_coords[0][1] = img->y;
+            image->uv_coords[1][0] = img->x;
+            image->uv_coords[1][1] = img->y + image->height;
+            image->uv_coords[2][0] = img->x + image->width;
+            image->uv_coords[2][1] = img->y;
+            image->uv_coords[3][0] = img->x + image->width;
+            image->uv_coords[3][1] = img->y + image->height;
+        }
 
         // insert the two new rectangles into our set
         struct Rect *horiz = add_free_rect(p);
@@ -987,10 +1027,52 @@ int rucksack_bundle_add_page(struct RuckSackBundle *bundle, const char *key,
     DWORD data_size;
     FreeImage_AcquireMemory(out_stream, &data, &data_size);
 
+    // calculate the total size needed by the texture and texture coordinates
+    // and calculate the offsets needed
+    long total_image_entries_size = 0;
+    for (int i = 0; i < p->images_count; i += 1) {
+        struct RuckSackImagePrivate *img = &p->images[i];
+        total_image_entries_size += 48 + img->key_size;
+    }
+    long image_data_offset = 12 + total_image_entries_size;
+    long total_size = image_data_offset + data_size;
+
     struct RuckSackOutStream *stream;
-    err = rucksack_bundle_add_stream(bundle, key, data_size, &stream);
+    err = rucksack_bundle_add_stream(bundle, key, total_size, &stream);
     if (err)
         return err;
+
+    unsigned char buf[48];
+    write_uint32be(&buf[0], image_data_offset);
+    write_uint32be(&buf[4], p->images_count);
+    write_uint32be(&buf[8], 12);
+
+    err = rucksack_stream_write(stream, buf, 12);
+    if (err)
+        return err;
+
+    for (int i = 0; i < p->images_count; i += 1) {
+        struct RuckSackImagePrivate *img = &p->images[i];
+        struct RuckSackImage *image = &img->externals;
+
+        write_uint32be(&buf[0], 48 + img->key_size);
+        write_uint32be(&buf[4], image->anchor_x);
+        write_uint32be(&buf[8], image->anchor_y);
+        for (int j = 0; j < 4; j += 1) {
+            for (int k = 0; k < 2; k += 1) {
+                write_uint32be(&buf[12 + j * 8 + k * 4], image->uv_coords[j][k]);
+            }
+        }
+        write_uint32be(&buf[44], img->key_size);
+
+        err = rucksack_stream_write(stream, buf, 48);
+        if (err)
+            return err;
+
+        err = rucksack_stream_write(stream, img->key, img->key_size);
+        if (err)
+            return err;
+    }
 
     err = rucksack_stream_write(stream, data, data_size);
     if (err)
@@ -1076,6 +1158,7 @@ static int allocate_file_entry(struct RuckSackBundlePrivate *b, const char *key,
     b->header_entry_count += 1;
     entry->key_size = strlen(key);
     entry->key = strdup(key);
+    entry->b = b;
     b->headers_byte_count += 32 + entry->key_size;
 
     allocate_file(b, size, entry);
@@ -1184,10 +1267,9 @@ const char *rucksack_file_name(struct RuckSackFileEntry *entry) {
     return entry->key;
 }
 
-int rucksack_bundle_file_read(struct RuckSackBundle *bundle, struct RuckSackFileEntry *e,
-        unsigned char *buffer)
+int rucksack_file_read(struct RuckSackFileEntry *e, unsigned char *buffer)
 {
-    struct RuckSackBundlePrivate *b = (struct RuckSackBundlePrivate *) bundle;
+    struct RuckSackBundlePrivate *b = e->b;
     if (fseek(b->f, e->offset, SEEK_SET))
         return RuckSackErrorFileAccess;
     long int amt_read = fread(buffer, 1, e->size, b->f);
@@ -1218,4 +1300,38 @@ void rucksack_bundle_get_files(struct RuckSackBundle *bundle,
 
 const char *rucksack_err_str(int err) {
     return ERROR_STR[err];
+}
+
+int rucksack_file_open_texture(struct RuckSackFileEntry *entry,
+        struct RuckSackTexture **texture)
+{
+    // TODO
+    return RuckSackErrorNone;
+}
+
+int rucksack_texture_close(struct RuckSackTexture *texture) {
+    // TODO
+    return RuckSackErrorNone;
+}
+
+long rucksack_texture_size(struct RuckSackTexture *texture) {
+    // TODO
+    return 0;
+}
+
+int rucksack_texture_read(struct RuckSackTexture *texture, unsigned char *buffer) {
+    // TODO
+    return RuckSackErrorNone;
+}
+
+long rucksack_texture_image_count(struct RuckSackTexture *texture) {
+    // TODO
+    return 0;
+}
+
+int rucksack_texture_get_images(struct RuckSackTexture *texture,
+        struct RuckSackImage **images)
+{
+    // TODO
+    return RuckSackErrorNone;
 }

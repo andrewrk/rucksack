@@ -56,13 +56,14 @@ struct RuckSackImage {
     int anchor_x;
     int anchor_y;
 
+    // assigned after a call to rucksack_bundle_add_page and also populated
+    // when reading a page from a bundle
     int width;
     int height;
-    // triangle strip (4 points, 2 coords each)
-    // 1----3
-    // |    |
-    // 2----4
-    int uv_coords[4][2];
+
+    int x;
+    int y;
+    char r90;
 };
 
 // a page contains multiple images. also known as texture or spritesheet

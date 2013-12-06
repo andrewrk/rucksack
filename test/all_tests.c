@@ -101,7 +101,36 @@ static void test_texture_packing(void) {
     struct RuckSackTexture *texture;
     ok(rucksack_file_open_texture(entry, &texture));
 
-    assert(rucksack_texture_image_count(texture) == 4);
+    long image_count = rucksack_texture_image_count(texture);
+    assert(image_count == 4);
+
+    struct RuckSackImage *images = malloc(sizeof(struct RuckSackImage) * image_count);
+    rucksack_texture_get_images(texture, &images);
+    char got_them[4];
+    for (int i = 0; i < image_count; i += 1) {
+        struct RuckSackImage *image = &images[i];
+        if (strcmp(image->name, "image0") == 0) {
+            got_them[0] = 1;
+            assert(image->width == 8);
+            assert(image->height == 8);
+        } else if (strcmp(image->name, "image1") == 0) {
+            got_them[1] = 1;
+            assert(image->width == 16);
+            assert(image->height == 16);
+        } else if (strcmp(image->name, "image2") == 0) {
+            got_them[2] = 1;
+            assert(image->width == 16);
+            assert(image->height == 16);
+        } else if (strcmp(image->name, "image3") == 0) {
+            got_them[3] = 1;
+            assert(image->width == 8);
+            assert(image->height == 8);
+        }
+    }
+    assert(got_them[0]);
+    assert(got_them[1]);
+    assert(got_them[2]);
+    assert(got_them[3]);
 
     rucksack_texture_close(texture);
 

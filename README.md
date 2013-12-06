@@ -136,6 +136,10 @@ below.
          0 | uint32be size of this image entry header in bytes
          4 | uint32be anchor x
          8 | uint32be anchor y
-        12 | uint32be[8] - triangle strip for this image in pixels
-        44 | uint32be key size in bytes
-        48 | key bytes
+        12 | uint32be image x
+        16 | uint32be image y
+        20 | uint32be unrotated image width
+        24 | uint32be unrotated image height
+        28 | uint8 boolean whether the image is rotated clockwise 90 degrees
+        32 | uint32be key size in bytes
+        36 | key bytes

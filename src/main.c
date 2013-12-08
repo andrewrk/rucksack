@@ -567,6 +567,9 @@ static int bundle_usage(char *arg0) {
 
 static int cat_usage(char *arg0) {
     fprintf(stderr, "Usage: %s cat bundlefile resourcename\n"
+            "\n"
+            "Options:\n"
+            "  [--texture]  interpret as texture and output the image.\n"
             , arg0);
     return 1;
 }
@@ -661,10 +664,16 @@ static int command_cat(char *arg0, int argc, char *argv[]) {
     char *bundle_filename = NULL;
     char *resource_name = NULL;
 
+    char is_texture = 0;
     for (int i = 0; i < argc; i += 1) {
         char *arg = argv[i];
         if (arg[0] == '-' && arg[1] == '-') {
-            return cat_usage(arg0);
+            arg += 2;
+            if (strcmp(arg, "texture") == 0) {
+                is_texture = 1;
+            } else {
+                return cat_usage(arg0);
+            }
         } else if (!bundle_filename) {
             bundle_filename = arg;
         } else if (!resource_name) {
@@ -694,22 +703,58 @@ static int command_cat(char *arg0, int argc, char *argv[]) {
         fprintf(stderr, "entry not found\n");
         return 1;
     }
-    size_t size = rucksack_file_size(entry);
-    unsigned char *buffer = malloc(size);
 
-    rs_err = rucksack_file_read(entry, buffer);
+    if (is_texture) {
+        struct RuckSackTexture *texture;
+        rs_err = rucksack_file_open_texture(entry, &texture);
 
-    if (rs_err) {
-        fprintf(stderr, "unable to read file entry: %s\n", rucksack_err_str(rs_err));
-        return 1;
+        if (rs_err) {
+            fprintf(stderr, "unable to open texture entry: %s\n", rucksack_err_str(rs_err));
+            return 1;
+        }
+
+        long size = rucksack_texture_size(texture);
+
+        unsigned char *buffer = malloc(size);
+        if (!buffer) {
+            fprintf(stderr, "out of memory\n");
+            return 1;
+        }
+        rs_err = rucksack_texture_read(texture, buffer);
+        if (rs_err) {
+            fprintf(stderr, "unable to read texture entry: %s\n", rucksack_err_str(rs_err));
+            return 1;
+        }
+
+        if (fwrite(buffer, 1, size, stdout) != size) {
+            fprintf(stderr, "error writing to stdout\n");
+            return 1;
+        }
+
+        rucksack_texture_close(texture);
+    } else {
+        long size = rucksack_file_size(entry);
+
+        unsigned char *buffer = malloc(size);
+        if (!buffer) {
+            fprintf(stderr, "out of memory\n");
+            return 1;
+        }
+
+        rs_err = rucksack_file_read(entry, buffer);
+
+        if (rs_err) {
+            fprintf(stderr, "unable to read file entry: %s\n", rucksack_err_str(rs_err));
+            return 1;
+        }
+
+        if (fwrite(buffer, 1, size, stdout) != size) {
+            fprintf(stderr, "error writing to stdout\n");
+            return 1;
+        }
+
+        free(buffer);
     }
-
-    if (fwrite(buffer, 1, size, stdout) != size) {
-        fprintf(stderr, "error writing to stdout\n");
-        return 1;
-    }
-
-    free(buffer);
 
     rs_err = rucksack_bundle_close(bundle);
     if (rs_err) {

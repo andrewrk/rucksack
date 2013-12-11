@@ -117,6 +117,7 @@ struct RuckSackFileEntry *rucksack_bundle_find_file(
         struct RuckSackBundle *bundle, const char *key);
 long rucksack_file_size(struct RuckSackFileEntry *entry);
 const char *rucksack_file_name(struct RuckSackFileEntry *entry);
+long rucksack_file_mtime(struct RuckSackFileEntry *entry);
 int rucksack_file_read(struct RuckSackFileEntry *entry, unsigned char *buffer);
 
 int rucksack_file_open_texture(struct RuckSackFileEntry *entry, struct RuckSackTexture **texture);

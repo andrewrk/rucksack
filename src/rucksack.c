@@ -17,6 +17,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <time.h>
 
 
 #define MAX(x, y) ((x) > (y) ? (x) : (y))
@@ -38,10 +39,11 @@ static const char *ERROR_STR[] = {
 
 struct RuckSackFileEntry {
     struct RuckSackBundlePrivate *b;
-    long int offset;
-    long int size;
-    long int allocated_size;
-    long int key_size;
+    long offset;
+    long size;
+    long allocated_size;
+    long key_size;
+    long mtime;
     char *key;
     char is_open; // flag for when an out stream is writing to this entry
 };
@@ -201,7 +203,7 @@ static int read_header(struct RuckSackBundlePrivate *b) {
     if (fseek(f, 0, SEEK_SET))
         return RuckSackErrorFileAccess;
 
-    unsigned char buf[32];
+    unsigned char buf[36];
     long int amt_read = fread(buf, 1, 24, f);
 
     if (amt_read != 24)
@@ -225,8 +227,8 @@ static int read_header(struct RuckSackBundlePrivate *b) {
     for (int i = 0; i < b->header_entry_count; i += 1) {
         if (fseek(f, header_offset, SEEK_SET))
             return RuckSackErrorFileAccess;
-        amt_read = fread(buf, 1, 32, f);
-        if (amt_read != 32)
+        amt_read = fread(buf, 1, 36, f);
+        if (amt_read != 36)
             return RuckSackErrorInvalidFormat;
         long int entry_size = read_uint32be(&buf[0]);
         header_offset += entry_size;
@@ -234,7 +236,8 @@ static int read_header(struct RuckSackBundlePrivate *b) {
         entry->offset = read_uint64be(&buf[4]);
         entry->size = read_uint64be(&buf[12]);
         entry->allocated_size = read_uint64be(&buf[20]);
-        entry->key_size = read_uint32be(&buf[28]);
+        entry->mtime = read_uint32be(&buf[28]);
+        entry->key_size = read_uint32be(&buf[32]);
         entry->key = malloc(entry->key_size + 1);
         if (!entry->key)
             return RuckSackErrorNoMem;
@@ -244,7 +247,7 @@ static int read_header(struct RuckSackBundlePrivate *b) {
         entry->key[entry->key_size] = 0;
         entry->b = b;
 
-        b->headers_byte_count += 32 + entry->key_size;
+        b->headers_byte_count += 36 + entry->key_size;
 
         if (!b->last_entry || entry->offset > b->last_entry->offset)
             b->last_entry = entry;
@@ -386,7 +389,7 @@ static void allocate_file(struct RuckSackBundlePrivate *b, long int size,
         b->last_entry = entry;
     } else {
         // this is the first entry in the bundle
-        b->first_file_offset = alloc_size(32 + entry->key_size) + b->first_header_offset;
+        b->first_file_offset = alloc_size(36 + entry->key_size) + b->first_header_offset;
         entry->offset = b->first_file_offset;
         b->first_entry = entry;
         b->last_entry = entry;
@@ -423,7 +426,7 @@ static int write_header(struct RuckSackBundlePrivate *b) {
     if (fseek(f, 0, SEEK_SET))
         return RuckSackErrorFileAccess;
 
-    unsigned char buf[32];
+    unsigned char buf[36];
     memcpy(buf, BUNDLE_UUID, 16);
     write_uint32be(&buf[16], b->first_header_offset);
     write_uint32be(&buf[20], b->header_entry_count);
@@ -450,13 +453,14 @@ static int write_header(struct RuckSackBundlePrivate *b) {
 
     for (int i = 0; i < b->header_entry_count; i += 1) {
         struct RuckSackFileEntry *entry = &b->entries[i];
-        write_uint32be(&buf[0], 32 + entry->key_size);
+        write_uint32be(&buf[0], 36 + entry->key_size);
         write_uint64be(&buf[4], entry->offset);
         write_uint64be(&buf[12], entry->size);
         write_uint64be(&buf[20], entry->allocated_size);
-        write_uint32be(&buf[28], entry->key_size);
-        amt_written = fwrite(buf, 1, 32, f);
-        if (amt_written != 32)
+        write_uint32be(&buf[28], entry->mtime);
+        write_uint32be(&buf[32], entry->key_size);
+        amt_written = fwrite(buf, 1, 36, f);
+        if (amt_written != 36)
             return RuckSackErrorFileAccess;
         amt_written = fwrite(entry->key, 1, entry->key_size, f);
         if (amt_written != entry->key_size)
@@ -468,7 +472,7 @@ static int write_header(struct RuckSackBundlePrivate *b) {
 
 static void init_new_bundle(struct RuckSackBundlePrivate *b) {
     b->first_header_offset = 24;
-    long int allocated_header_bytes = alloc_size(32);
+    long int allocated_header_bytes = alloc_size(36);
     b->first_file_offset = b->first_header_offset + allocated_header_bytes;
 }
 
@@ -1188,6 +1192,7 @@ int rucksack_bundle_add_stream(struct RuckSackBundle *bundle,
     }
     stream->e->is_open = 1;
     stream->e->size = 0;
+    stream->e->mtime = time(0);
 
     *out_stream = stream;
     return RuckSackErrorNone;
@@ -1389,4 +1394,8 @@ void rucksack_texture_get_images(struct RuckSackTexture *texture,
     for (int i = 0; i < texture->image_count; i += 1) {
         images[i] = &texture->images[i];
     }
+}
+
+long rucksack_file_mtime(struct RuckSackFileEntry *entry) {
+    return entry->mtime;
 }

@@ -93,6 +93,7 @@ static char parse_err_occurred = 0;
 static char strbuf[2048];
 static char strbuf2[2048];
 static char strbuf3[2048];
+static char strbuf4[2048];
 
 static struct RuckSackPage *page = NULL;
 static char *page_key = NULL;
@@ -110,6 +111,7 @@ static char *glob_path = NULL;
 static char *glob_prefix = NULL;
 
 static char debug_mode = 0;
+static char verbose = 0;
 
 static const char *ERR_STR[] = {
     "",
@@ -151,6 +153,32 @@ static char *resolve_path(const char *path) {
     return out;
 }
 
+
+static int add_file_if_outdated(struct RuckSackBundle *bundle, char *key, char *path) {
+    struct RuckSackFileEntry *entry = rucksack_bundle_find_file(bundle, key);
+    if (entry) {
+        long bundle_mtime = rucksack_file_mtime(entry);
+        struct stat st;
+        stat(path, &st);
+        long file_mtime = st.st_mtime;
+        if (file_mtime <= bundle_mtime) {
+            if (verbose)
+                fprintf(stderr, "File up to date: %s\n", key);
+            return 0;
+        }
+        if (verbose)
+            fprintf(stderr, "Updating file: %s\n", key);
+    } else if (verbose) {
+        fprintf(stderr, "New file: %s\n", key);
+    }
+    int err = rucksack_bundle_add_file(bundle, key, path);
+    if (err) {
+        snprintf(strbuf, sizeof(strbuf), "unable to add %s: %s", path, rucksack_err_str(err));
+        return parse_error(strbuf);
+    }
+    return 0;
+}
+
 static int glob_insert_files(void) {
     char *use_glob_str = glob_glob ? glob_glob : "*";
     char *use_glob_path = glob_path ? glob_path : "";
@@ -174,8 +202,8 @@ static int glob_insert_files(void) {
         struct stat s;
         char *path = glob_result.gl_pathv[i];
         if (stat(path, &s) != 0) {
-            snprintf(strbuf, sizeof(strbuf), "unable to stat %s", path);
-            return parse_error(strbuf);
+            snprintf(strbuf4, sizeof(strbuf4), "unable to stat %s", path);
+            return parse_error(strbuf4);
         }
 
         if (S_ISDIR(s.st_mode))
@@ -184,12 +212,9 @@ static int glob_insert_files(void) {
         // compute a relative path so we can use it to build the key
         path_relative(strbuf3, path, strbuf2);
 
-        snprintf(strbuf, sizeof(strbuf), "%s%s", use_glob_prefix, strbuf2);
-        err = rucksack_bundle_add_file(bundle, strbuf, path);
-        if (err) {
-            snprintf(strbuf, sizeof(strbuf), "unable to add %s: %s", path, rucksack_err_str(err));
-            return parse_error(strbuf);
-        }
+        snprintf(strbuf4, sizeof(strbuf4), "%s%s", use_glob_prefix, strbuf2);
+        err = add_file_if_outdated(bundle, strbuf4, path);
+        if (err) return err;
     }
 
     globfree(&glob_result);
@@ -502,11 +527,8 @@ static int on_end(struct LaxJsonContext *json, enum LaxJsonType type) {
             state = StateImageName;
             break;
         case StateFilePropName:
-            err = rucksack_bundle_add_file(bundle, file_key, file_path);
-            if (err) {
-                snprintf(strbuf, sizeof(strbuf), "unable to add file: %s", rucksack_err_str(err));
-                return parse_error(strbuf);
-            }
+            err = add_file_if_outdated(bundle, file_key, file_path);
+            if (err) return err;
 
             free(file_path);
             file_path = NULL;
@@ -582,7 +604,9 @@ static int command_bundle(char *arg0, int argc, char *argv[]) {
         char *arg = argv[i];
         if (arg[0] == '-' && arg[1] == '-') {
             arg += 2;
-            if (i + 1 >= argc) {
+            if (strcmp(arg, "verbose") == 0) {
+                verbose = 1;
+            } else if (i + 1 >= argc) {
                 return bundle_usage(arg0);
             } else if (strcmp(arg, "prefix") == 0) {
                 path_prefix = argv[++i];

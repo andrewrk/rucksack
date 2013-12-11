@@ -117,8 +117,9 @@ below.
          4 | uint64be offset of this entry's file contents
         12 | uint64be actual size of the file contents in bytes
         20 | uint64be number of allocated bytes for this file
-        28 | uint32be key size in bytes
-        32 | key bytes
+        28 | uint32be file mtime
+        32 | uint32be key size in bytes
+        36 | key bytes
 
 
 ### Texture Format

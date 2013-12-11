@@ -113,6 +113,8 @@ static char *glob_prefix = NULL;
 static char debug_mode = 0;
 static char verbose = 0;
 
+static long latest_mtime = 0;
+
 static const char *ERR_STR[] = {
     "",
     "unexpected char",
@@ -153,6 +155,35 @@ static char *resolve_path(const char *path) {
     return out;
 }
 
+static void check_latest_mtime(const char *path) {
+    struct stat st;
+    stat(path, &st);
+    long mtime = st.st_mtime;
+    if (mtime > latest_mtime)
+        latest_mtime = mtime;
+}
+
+static int add_page_if_outdated(struct RuckSackBundle *bundle, char *key, struct RuckSackPage *page) {
+    struct RuckSackFileEntry *entry = rucksack_bundle_find_file(bundle, key);
+    if (entry) {
+        long bundle_mtime = rucksack_file_mtime(entry);
+        if (latest_mtime <= bundle_mtime) {
+            if (verbose)
+                fprintf(stderr, "Texture up to date: %s\n", key);
+            return 0;
+        }
+        if (verbose)
+            fprintf(stderr, "Updating texture: %s\n", key);
+    } else if (verbose) {
+        fprintf(stderr, "New texture: %s\n", key);
+    }
+    int err = rucksack_bundle_add_page(bundle, key, page);
+    if (err) {
+        snprintf(strbuf, sizeof(strbuf), "unable to add page: %s", rucksack_err_str(err));
+        return parse_error(strbuf);
+    }
+    return 0;
+}
 
 static int add_file_if_outdated(struct RuckSackBundle *bundle, char *key, char *path) {
     struct RuckSackFileEntry *entry = rucksack_bundle_find_file(bundle, key);
@@ -518,6 +549,7 @@ static int on_end(struct LaxJsonContext *json, enum LaxJsonType type) {
                 snprintf(strbuf, sizeof(strbuf), "unable to add image to page: %s", rucksack_err_str(err));
                 return parse_error(strbuf);
             }
+            check_latest_mtime(image.name);
 
             free(image.name);
             image.name = NULL;
@@ -544,11 +576,8 @@ static int on_end(struct LaxJsonContext *json, enum LaxJsonType type) {
             state = StateTextureProp;
             break;
         case StateTextureProp:
-            err = rucksack_bundle_add_page(bundle, page_key, page);
-            if (err) {
-                snprintf(strbuf, sizeof(strbuf), "unable to add page: %s", rucksack_err_str(err));
-                return parse_error(strbuf);
-            }
+            err = add_page_if_outdated(bundle, page_key, page);
+            if (err) return err;
 
             rucksack_page_destroy(page);
             page = NULL;
@@ -583,6 +612,7 @@ static int bundle_usage(char *arg0) {
             "\n"
             "Options:\n"
             "  [--prefix path]  assets are loaded relative to this path. defaults to cwd\n"
+            "  [--verbose]      print what is happening while it is happening\n"
             , arg0);
     return 1;
 }

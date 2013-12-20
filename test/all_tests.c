@@ -5,6 +5,8 @@
  * See http://opensource.org/licenses/MIT
  */
 
+#undef NDEBUG
+
 #include <rucksack.h>
 #include <stdio.h>
 #include <assert.h>

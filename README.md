@@ -8,7 +8,7 @@ format, detailed at the end of this readme.)
 ## Command Line Usage
 
 ```
-rucksack v0.0.0
+rucksack v1.0.0
 
 Usage: rucksack [command] [command-options]
 
@@ -44,6 +44,18 @@ int main() {
  * [liblaxjson](https://github.com/superjoe30/liblaxjson)
 
 ## Installation
+
+### Pre-Built Packages
+
+ * [Ubuntu PPA](https://launchpad.net/~andrewrk/+archive/rucksack)
+
+   ```
+   sudo apt-add-repository ppa:andrewrk/rucksack
+   sudo apt-get update
+   sudo apt-get install rucksack
+   ```
+
+### From Source
 
 1. `mkdir build && cd build && cmake ..`
 2. Verify that all dependencies say "OK".

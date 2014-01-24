@@ -41,7 +41,7 @@ int main() {
 ## Dependencies
 
  * [FreeImage](http://freeimage.sourceforge.net/)
- * [liblaxjson](https://github.com/superjoe30/liblaxjson)
+ * [liblaxjson](https://github.com/andrewrk/liblaxjson)
 
 ## Installation
 

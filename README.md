@@ -156,3 +156,9 @@ below.
         28 | uint8 boolean whether the image is rotated clockwise 90 degrees
         32 | uint32be key size in bytes
         36 | key bytes
+
+## Projects Using rucksack
+
+Feel free to make a pull request adding to this list.
+
+ * [spacefight](https://github.com/andrewrk/spacefight) - 3D asteroids prototype

@@ -2,8 +2,14 @@
 
 Texture packer and resource bundler. Use the rucksack executable to build your
 resources file, and then depend on librucksack in-game to get the resources out
-at runtime. (or roll your own resource-loading code using the very simple file
-format, detailed at the end of this readme.)
+at runtime. Alternately, roll your own resource-loading code using the file
+format detailed at the end of this README.
+
+rucksack defines a resource manifest file format which is loosely based on JSON
+but accepts comments, extra punctuation, and unquoted strings. This manifest
+file tells rucksack which files to bundle and how to store them. rucksack uses
+a rectangle bin packing algorithm to efficiently store multiple images into a
+single texture, otherwise known as a "sprite sheet".
 
 ## Command Line Usage
 

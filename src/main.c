@@ -180,11 +180,21 @@ static void check_latest_mtime(const char *path) {
         latest_mtime = mtime;
 }
 
-static int add_texture_if_outdated(struct RuckSackBundle *bundle, char *key, struct RuckSackTexture *texture) {
+static int add_texture_if_outdated(struct RuckSackBundle *bundle, char *key,
+        struct RuckSackTexture *texture)
+{
     struct RuckSackFileEntry *entry = rucksack_bundle_find_file(bundle, key);
     if (entry) {
+        struct RuckSackTexture *bundle_texture;
+        rucksack_file_open_texture(entry, &bundle_texture);
         long bundle_mtime = rucksack_file_mtime(entry);
-        if (latest_mtime <= bundle_mtime) {
+        int up_to_date = latest_mtime <= bundle_mtime &&
+            bundle_texture->max_width == texture->max_width &&
+            bundle_texture->max_height == texture->max_height &&
+            bundle_texture->allow_r90 == texture->allow_r90 &&
+            bundle_texture->allow_r90 == texture->allow_r90;
+        rucksack_texture_close(bundle_texture);
+        if (up_to_date) {
             if (verbose)
                 fprintf(stderr, "Texture up to date: %s\n", key);
             return 0;

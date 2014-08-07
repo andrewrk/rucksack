@@ -206,6 +206,9 @@ static int read_header(struct RuckSackBundlePrivate *b) {
     unsigned char buf[36];
     long int amt_read = fread(buf, 1, 24, f);
 
+    if (amt_read == 0)
+        return RuckSackErrorEmptyFile;
+
     if (amt_read != 24)
         return RuckSackErrorInvalidFormat;
 
@@ -494,15 +497,21 @@ int rucksack_bundle_open(const char *bundle_path, struct RuckSackBundle **out_bu
 
     init_new_bundle(b);
 
+    int open_for_writing = 0;
     b->f = fopen(bundle_path, "rb+");
     if (b->f) {
         int err = read_header(b);
-        if (err) {
+        if (err == RuckSackErrorEmptyFile) {
+            open_for_writing = 1;
+        } else if (err) {
             free(b);
             *out_bundle = NULL;
             return err;
         }
     } else {
+        open_for_writing = 1;
+    }
+    if (open_for_writing) {
         b->f = fopen(bundle_path, "wb+");
         if (!b->f) {
             free(b);

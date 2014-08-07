@@ -221,6 +221,23 @@ static void test_16kb_file(void) {
     ok(rucksack_bundle_close(bundle));
 }
 
+static void test_empty_bundle(void) {
+    const char *bundle_name = "test.bundle";
+    remove(bundle_name);
+
+    // create empty file
+    FILE *f = fopen(bundle_name, "w");
+    assert(f);
+    int ret = fclose(f);
+    assert(ret == 0);
+
+    // open and close bundle should be OK
+    struct RuckSackBundle *bundle;
+    ok(rucksack_bundle_open(bundle_name, &bundle));
+    ok(rucksack_bundle_close(bundle));
+}
+
+
 struct Test {
     const char *name;
     void (*fn)(void);
@@ -233,6 +250,7 @@ static struct Test tests[] = {
     {"bundling twice", test_bundling_twice},
     {"add 3 files", test_three_files},
     {"add a file larger than 16KB", test_16kb_file},
+    {"write to an empty bundle", test_empty_bundle},
     {NULL, NULL},
 };
 

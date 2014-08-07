@@ -23,6 +23,7 @@ enum RuckSackError {
     RuckSackErrorNoPixels,
     RuckSackErrorImageFormat,
     RuckSackErrorNotFound,
+    RuckSackErrorEmptyFile,
 };
 
 struct RuckSackBundle {

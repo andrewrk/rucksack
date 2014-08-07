@@ -85,11 +85,11 @@ install(FILES "src/rucksack.h" DESTINATION include)
 
 enable_testing()
 include_directories("${PROJECT_SOURCE_DIR}/src")
-add_executable(all_tests test/all_tests.c)
-set_target_properties(all_tests PROPERTIES
+add_executable(test_library test/test_library.c)
+set_target_properties(test_library PROPERTIES
   COMPILE_FLAGS ${EXE_CFLAGS})
-target_link_libraries(all_tests rucksack_shared)
-add_test(AllTests all_tests)
+target_link_libraries(test_library rucksack_shared)
+add_test(LibraryTests test_library)
 
 add_executable(test_path test/test_path.c src/path.c src/path.h)
 set_target_properties(test_path PROPERTIES

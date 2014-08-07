@@ -73,8 +73,8 @@ set_target_properties(rucksack_shared PROPERTIES
 target_link_libraries(rucksack_shared ${FreeImage_LIBRARIES})
 
 add_executable(rucksack ${EXE_SOURCES} ${EXE_HEADERS})
-target_link_libraries(rucksack rucksack_shared ${LAXJSON_LIBRARIES})
-include_directories(${LAXJSON_INCLUDE_DIRS})
+target_link_libraries(rucksack rucksack_shared ${LAXJSON_LIBRARY})
+include_directories(${LAXJSON_INCLUDE_DIR})
 set_target_properties(rucksack PROPERTIES
   COMPILE_FLAGS ${EXE_CFLAGS})
 

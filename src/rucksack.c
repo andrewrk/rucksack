@@ -31,7 +31,7 @@ static const char *ERROR_STR[] = {
     "problem accessing file",
     "invalid bundle format",
     "invalid anchor enum value",
-    "cannot fit all images into page",
+    "cannot fit all images into texture",
     "image has no pixels",
     "unrecognized image format",
     "key not found",
@@ -42,18 +42,10 @@ struct RuckSackFileEntry {
     long offset;
     long size;
     long allocated_size;
-    long key_size;
+    int key_size;
     long mtime;
     char *key;
     char is_open; // flag for when an out stream is writing to this entry
-};
-
-struct RuckSackTexture {
-    struct RuckSackFileEntry *entry;
-    long image_count;
-    struct RuckSackImage *images;
-    long pixel_data_offset;
-    long pixel_data_size;
 };
 
 struct RuckSackBundlePrivate {
@@ -75,8 +67,6 @@ struct RuckSackBundlePrivate {
 struct RuckSackImagePrivate {
     struct RuckSackImage externals;
 
-    char *key;
-    long key_size;
     FIBITMAP *bmp;
 };
 
@@ -87,8 +77,8 @@ struct Rect {
     int h;
 };
 
-struct RuckSackPagePrivate {
-    struct RuckSackPage externals;
+struct RuckSackTexturePrivate {
+    struct RuckSackTexture externals;
 
     struct RuckSackImagePrivate *images;
     int images_count;
@@ -101,6 +91,11 @@ struct RuckSackPagePrivate {
 
     int width;
     int height;
+
+    // for reading
+    struct RuckSackFileEntry *entry;
+    long pixel_data_offset;
+    long pixel_data_size;
 };
 
 struct RuckSackOutStream {
@@ -544,41 +539,48 @@ int rucksack_bundle_close(struct RuckSackBundle *bundle) {
     return write_err || close_err;
 }
 
-struct RuckSackPage *rucksack_page_create(void) {
-    struct RuckSackPagePrivate *p = calloc(1, sizeof(struct RuckSackPagePrivate));
+struct RuckSackTexture *rucksack_texture_create(void) {
+    struct RuckSackTexturePrivate *p = calloc(1, sizeof(struct RuckSackTexturePrivate));
     if (!p) return NULL;
-    struct RuckSackPage *page = &p->externals;
-    page->max_width = 1024;
-    page->max_height = 1024;
-    page->pow2 = 1;
-    page->allow_r90 = 1;
+    struct RuckSackTexture *texture = &p->externals;
+    texture->max_width = 1024;
+    texture->max_height = 1024;
+    texture->pow2 = 1;
+    texture->allow_r90 = 1;
     return &p->externals;
 }
 
-void rucksack_page_destroy(struct RuckSackPage *page) {
-    struct RuckSackPagePrivate *p = (struct RuckSackPagePrivate *) page;
-    while (p->images_count) {
-        p->images_count -= 1;
-        struct RuckSackImagePrivate *img = &p->images[p->images_count];
-        free(img->key);
+void rucksack_texture_destroy(struct RuckSackTexture *texture) {
+    struct RuckSackTexturePrivate *t = (struct RuckSackTexturePrivate *) texture;
+    while (t->images_count) {
+        t->images_count -= 1;
+        struct RuckSackImagePrivate *img = &t->images[t->images_count];
+        struct RuckSackImage *image = &img->externals;
+        free(image->key);
         FreeImage_Unload(img->bmp);
     }
-    free(p->images);
-    free(p->free_positions);
-    free(p);
+    free(t->images);
+    free(t->free_positions);
+    free(t);
 }
 
-int rucksack_page_add_image(struct RuckSackPage *page, const char *key,
-        struct RuckSackImage *userimg)
-{
-    struct RuckSackPagePrivate *p = (struct RuckSackPagePrivate *) page;
+static char *dupe_byte_str(char *src, int len) {
+    char *dest = malloc(len);
+    if (dest)
+        memcpy(dest, src, len);
+    return dest;
+}
 
-    FREE_IMAGE_FORMAT fmt = FreeImage_GetFileType(userimg->name, 0);
+int rucksack_texture_add_image(struct RuckSackTexture *texture, struct RuckSackImage *userimg)
+{
+    struct RuckSackTexturePrivate *p = (struct RuckSackTexturePrivate *) texture;
+
+    FREE_IMAGE_FORMAT fmt = FreeImage_GetFileType(userimg->path, 0);
 
     if (fmt == FIF_UNKNOWN || !FreeImage_FIFSupportsReading(fmt))
         return RuckSackErrorImageFormat;
 
-    FIBITMAP *bmp = FreeImage_Load(fmt, userimg->name, 0);
+    FIBITMAP *bmp = FreeImage_Load(fmt, userimg->path, 0);
 
     if (!bmp)
         return RuckSackErrorFileAccess;
@@ -594,62 +596,65 @@ int rucksack_page_add_image(struct RuckSackPage *page, const char *key,
             return RuckSackErrorNoMem;
         p->images = new_ptr;
     }
-    struct RuckSackImagePrivate *i = &p->images[p->images_count];
-    struct RuckSackImage *img = &i->externals;
-    p->images_count += 1;
+    struct RuckSackImagePrivate *img = &p->images[p->images_count];
+    struct RuckSackImage *image = &img->externals;
 
-    i->bmp = bmp;
+    img->bmp = bmp;
 
-    img->width = FreeImage_GetWidth(bmp);
-    img->height = FreeImage_GetHeight(bmp);
+    image->width = FreeImage_GetWidth(bmp);
+    image->height = FreeImage_GetHeight(bmp);
 
-    img->anchor = RuckSackAnchorExplicit;
+    image->anchor = RuckSackAnchorExplicit;
     switch (userimg->anchor) {
         case RuckSackAnchorExplicit:
             // nothing to do
             break;
         case RuckSackAnchorCenter:
-            img->anchor_x = img->width / 2;
-            img->anchor_y = img->height / 2;
+            image->anchor_x = image->width / 2;
+            image->anchor_y = image->height / 2;
             break;
         case RuckSackAnchorLeft:
-            img->anchor_x = 0;
-            img->anchor_y = img->height / 2;
+            image->anchor_x = 0;
+            image->anchor_y = image->height / 2;
             break;
         case RuckSackAnchorRight:
-            img->anchor_x = img->width - 1;
-            img->anchor_y = img->height / 2;
+            image->anchor_x = image->width - 1;
+            image->anchor_y = image->height / 2;
             break;
         case RuckSackAnchorTop:
-            img->anchor_x = img->width / 2;
-            img->anchor_y = 0;
+            image->anchor_x = image->width / 2;
+            image->anchor_y = 0;
             break;
         case RuckSackAnchorBottom:
-            img->anchor_x = img->width / 2;
-            img->anchor_y = img->height - 1;
+            image->anchor_x = image->width / 2;
+            image->anchor_y = image->height - 1;
             break;
         case RuckSackAnchorTopLeft:
-            img->anchor_x = 0;
-            img->anchor_y = 0;
+            image->anchor_x = 0;
+            image->anchor_y = 0;
             break;
         case RuckSackAnchorTopRight:
-            img->anchor_x = img->width - 1;
-            img->anchor_y = 0;
+            image->anchor_x = image->width - 1;
+            image->anchor_y = 0;
             break;
         case RuckSackAnchorBottomLeft:
-            img->anchor_x = 0;
-            img->anchor_y = img->height - 1;
+            image->anchor_x = 0;
+            image->anchor_y = image->height - 1;
             break;
         case RuckSackAnchorBottomRight:
-            img->anchor_x = img->width - 1;
-            img->anchor_y = img->height - 1;
+            image->anchor_x = image->width - 1;
+            image->anchor_y = image->height - 1;
             break;
         default:
             return RuckSackErrorInvalidAnchor;
     }
+    image->key_size = userimg->key_size;
+    image->key = dupe_byte_str(userimg->key, userimg->key_size);
+    if (!image->key)
+        return RuckSackErrorNoMem;
 
-    i->key = strdup(key);
-    i->key_size = strlen(key);
+    // do this now that we know the image is valid
+    p->images_count += 1;
 
     return RuckSackErrorNone;
 }
@@ -685,7 +690,7 @@ static int compare_images(const void *a, const void *b) {
     return (delta == 0) ? (other_dim_b - other_dim_a) : delta;
 }
 
-static struct Rect *add_free_rect(struct RuckSackPagePrivate *p) {
+static struct Rect *add_free_rect(struct RuckSackTexturePrivate *p) {
     // search for garbage
     if (p->garbage_count > 0) {
         for (int i = 0; i < p->free_pos_count; i += 1) {
@@ -711,7 +716,7 @@ static struct Rect *add_free_rect(struct RuckSackPagePrivate *p) {
     return ptr;
 }
 
-static void remove_free_rect(struct RuckSackPagePrivate *p, struct Rect *r) {
+static void remove_free_rect(struct RuckSackTexturePrivate *p, struct Rect *r) {
     // mark the object as absent
     r->x = -1;
     p->garbage_count += 1;
@@ -732,8 +737,8 @@ static char rects_intersect(struct Rect *r1, struct Rect *r2) {
             r2->y < r1->y + r1->h);
 }
 
-static int do_maxrect_bssf(struct RuckSackPage *page) {
-    struct RuckSackPagePrivate *p = (struct RuckSackPagePrivate *) page;
+static int do_maxrect_bssf(struct RuckSackTexture *texture) {
+    struct RuckSackTexturePrivate *p = (struct RuckSackTexturePrivate *) texture;
 
     // the Maximal Rectangles Algorithm, Best Short Side Fit
     // calculate the positions according to max width and height. later we'll crop.
@@ -746,10 +751,10 @@ static int do_maxrect_bssf(struct RuckSackPage *page) {
         return RuckSackErrorNoMem;
     r->x = 0;
     r->y = 0;
-    r->w = page->max_width;
-    r->h = page->max_height;
+    r->w = texture->max_width;
+    r->h = texture->max_height;
 
-    // keep track of the actual page size
+    // keep track of the actual texture size
     p->width = 0;
     p->height = 0;
 
@@ -782,7 +787,7 @@ static int do_maxrect_bssf(struct RuckSackPage *page) {
             }
 
             // calculate short side fit with rotating 90 degrees
-            if (page->allow_r90) {
+            if (texture->allow_r90) {
                 w_len = free_r->w - image->height;
                 h_len = free_r->h - image->width;
                 short_side = (w_len < h_len) ? w_len : h_len;
@@ -811,7 +816,7 @@ static int do_maxrect_bssf(struct RuckSackPage *page) {
         image->y = img_rect.y;
         image->r90 = best_short_side_is_r90;
 
-        // keep track of page boundaries
+        // keep track of texture boundaries
         p->width = MAX(image->x + img_rect.w, p->width);
         p->height = MAX(image->y + img_rect.h, p->height);
 
@@ -950,18 +955,18 @@ static int next_pow2(int x) {
     return power;
 }
 
-int rucksack_bundle_add_page(struct RuckSackBundle *bundle, const char *key,
-        struct RuckSackPage *page)
+int rucksack_bundle_add_texture(struct RuckSackBundle *bundle, const char *key,
+        struct RuckSackTexture *texture)
 {
-    struct RuckSackPagePrivate *p = (struct RuckSackPagePrivate *) page;
+    struct RuckSackTexturePrivate *p = (struct RuckSackTexturePrivate *) texture;
 
     // assigns x and y positions to all images
-    int err = do_maxrect_bssf(page);
+    int err = do_maxrect_bssf(texture);
     if (err)
         return err;
 
     // find the smallest power of 2 width/height
-    if (page->pow2) {
+    if (texture->pow2) {
         p->width = next_pow2(p->width);
         p->height = next_pow2(p->height);
     }
@@ -1018,7 +1023,8 @@ int rucksack_bundle_add_page(struct RuckSackBundle *bundle, const char *key,
     long total_image_entries_size = 0;
     for (int i = 0; i < p->images_count; i += 1) {
         struct RuckSackImagePrivate *img = &p->images[i];
-        total_image_entries_size += 36 + img->key_size;
+        struct RuckSackImage *image = &img->externals;
+        total_image_entries_size += 36 + image->key_size;
     }
     long image_data_offset = 12 + total_image_entries_size;
     long total_size = image_data_offset + data_size;
@@ -1041,7 +1047,7 @@ int rucksack_bundle_add_page(struct RuckSackBundle *bundle, const char *key,
         struct RuckSackImagePrivate *img = &p->images[i];
         struct RuckSackImage *image = &img->externals;
 
-        write_uint32be(&buf[0], 36 + img->key_size);
+        write_uint32be(&buf[0], 36 + image->key_size);
         write_uint32be(&buf[4], image->anchor_x);
         write_uint32be(&buf[8], image->anchor_y);
         write_uint32be(&buf[12], image->x);
@@ -1049,13 +1055,13 @@ int rucksack_bundle_add_page(struct RuckSackBundle *bundle, const char *key,
         write_uint32be(&buf[20], image->width);
         write_uint32be(&buf[24], image->height);
         buf[28] = image->r90;
-        write_uint32be(&buf[32], img->key_size);
+        write_uint32be(&buf[32], image->key_size);
 
         err = rucksack_stream_write(stream, buf, 36);
         if (err)
             return err;
 
-        err = rucksack_stream_write(stream, img->key, img->key_size);
+        err = rucksack_stream_write(stream, image->key, image->key_size);
         if (err)
             return err;
     }
@@ -1294,10 +1300,11 @@ int rucksack_file_open_texture(struct RuckSackFileEntry *entry,
 {
     *out_texture = NULL;
 
-    struct RuckSackTexture *texture = calloc(1, sizeof(struct RuckSackTexture));
-    if (!texture)
+    struct RuckSackTexturePrivate *t = calloc(1, sizeof(struct RuckSackTexturePrivate));
+    struct RuckSackTexture *texture = &t->externals;
+    if (!t)
         return RuckSackErrorNoMem;
-    texture->entry = entry;
+    t->entry = entry;
 
     struct RuckSackBundlePrivate *b = entry->b;
     if (fseek(b->f, entry->offset, SEEK_SET)) {
@@ -1312,21 +1319,22 @@ int rucksack_file_open_texture(struct RuckSackFileEntry *entry,
         return RuckSackErrorFileAccess;
     }
 
-    texture->pixel_data_offset = read_uint32be(&buf[0]);
-    texture->pixel_data_size = entry->size - texture->pixel_data_offset;
-    texture->image_count = read_uint32be(&buf[4]);
+    t->pixel_data_offset = read_uint32be(&buf[0]);
+    t->pixel_data_size = entry->size - t->pixel_data_offset;
+    t->images_count = read_uint32be(&buf[4]);
     long offset_to_first_img = read_uint32be(&buf[8]);
 
-    texture->images = calloc(texture->image_count, sizeof(struct RuckSackImage));
+    t->images = calloc(t->images_count, sizeof(struct RuckSackImagePrivate));
 
-    if (!texture->images) {
+    if (!t->images) {
         rucksack_texture_close(texture);
         return RuckSackErrorNoMem;
     }
 
     long next_offset = entry->offset + offset_to_first_img;
-    for (int i = 0; i < texture->image_count; i += 1) {
-        struct RuckSackImage *image = &texture->images[i];
+    for (int i = 0; i < t->images_count; i += 1) {
+        struct RuckSackImagePrivate *img = &t->images[i];
+        struct RuckSackImage *image = &img->externals;
         image->anchor = RuckSackAnchorExplicit;
 
         if (fseek(b->f, next_offset, SEEK_SET)) {
@@ -1351,18 +1359,18 @@ int rucksack_file_open_texture(struct RuckSackFileEntry *entry,
         image->height = read_uint32be(&buf[24]);
         image->r90 = buf[28];
 
-        long key_size = read_uint32be(&buf[32]);
-        image->name = malloc(key_size + 1);
-        if (!image->name) {
+        image->key_size = read_uint32be(&buf[32]);
+        image->key = malloc(image->key_size + 1);
+        if (!image->key) {
             rucksack_texture_close(texture);
             return RuckSackErrorNoMem;
         }
-        amt_read = fread(image->name, 1, key_size, b->f);
-        if (amt_read != key_size) {
+        amt_read = fread(image->key, 1, image->key_size, b->f);
+        if (amt_read != image->key_size) {
             rucksack_texture_close(texture);
             return RuckSackErrorFileAccess;
         }
-        image->name[key_size] = 0;
+        image->key[image->key_size] = 0;
     }
 
     *out_texture = texture;
@@ -1370,41 +1378,48 @@ int rucksack_file_open_texture(struct RuckSackFileEntry *entry,
 }
 
 void rucksack_texture_close(struct RuckSackTexture *texture) {
-    if (texture->images) {
-        for (int i = 0; i < texture->image_count; i += 1) {
-            struct RuckSackImage *image = &texture->images[i];
-            if (image->name)
-                free(image->name);
+    struct RuckSackTexturePrivate *t = (struct RuckSackTexturePrivate *) texture;
+    if (t->images) {
+        for (int i = 0; i < t->images_count; i += 1) {
+            struct RuckSackImagePrivate *img = &t->images[i];
+            struct RuckSackImage *image = &img->externals;
+            free(image->key);
         }
-        free(texture->images);
+        free(t->images);
     }
-    free(texture);
+    free(t);
 }
 
 long rucksack_texture_size(struct RuckSackTexture *texture) {
-    return texture->pixel_data_size;
+    struct RuckSackTexturePrivate *t = (struct RuckSackTexturePrivate *) texture;
+    return t->pixel_data_size;
 }
 
 int rucksack_texture_read(struct RuckSackTexture *texture, unsigned char *buffer) {
-    struct RuckSackFileEntry *entry = texture->entry;
+    struct RuckSackTexturePrivate *t = (struct RuckSackTexturePrivate *) texture;
+    struct RuckSackFileEntry *entry = t->entry;
     FILE *f = entry->b->f;
-    if (fseek(f, entry->offset + texture->pixel_data_offset, SEEK_SET))
+    if (fseek(f, entry->offset + t->pixel_data_offset, SEEK_SET))
         return RuckSackErrorFileAccess;
-    long int amt_read = fread(buffer, 1, texture->pixel_data_size, f);
-    if (amt_read != texture->pixel_data_size)
+    long int amt_read = fread(buffer, 1, t->pixel_data_size, f);
+    if (amt_read != t->pixel_data_size)
         return RuckSackErrorFileAccess;
     return RuckSackErrorNone;
 }
 
 long rucksack_texture_image_count(struct RuckSackTexture *texture) {
-    return texture->image_count;
+    struct RuckSackTexturePrivate *t = (struct RuckSackTexturePrivate *) texture;
+    return t->images_count;
 }
 
 void rucksack_texture_get_images(struct RuckSackTexture *texture,
         struct RuckSackImage **images)
 {
-    for (int i = 0; i < texture->image_count; i += 1) {
-        images[i] = &texture->images[i];
+    struct RuckSackTexturePrivate *t = (struct RuckSackTexturePrivate *) texture;
+    for (int i = 0; i < t->images_count; i += 1) {
+        struct RuckSackImagePrivate *img = &t->images[i];
+        struct RuckSackImage *image = &img->externals;
+        images[i] = image;
     }
 }
 

@@ -109,14 +109,13 @@ static char strbuf2[2048];
 static char strbuf3[2048];
 static char strbuf4[2048];
 
-static struct RuckSackPage *page = NULL;
-static char *page_key = NULL;
+static struct RuckSackTexture *texture = NULL;
+static char *texture_key = NULL;
 
 static char *file_key = NULL;
 static char *file_path = NULL;
 
 struct RuckSackImage image;
-static char *image_key = NULL;
 
 static char *path_prefix = ".";
 
@@ -168,7 +167,8 @@ static int parse_error(const char *msg) {
 
 static char *resolve_path(const char *path) {
     char *out = malloc(2048);
-    path_resolve(path_prefix, path, out);
+    if (out)
+        path_resolve(path_prefix, path, out);
     return out;
 }
 
@@ -180,7 +180,7 @@ static void check_latest_mtime(const char *path) {
         latest_mtime = mtime;
 }
 
-static int add_page_if_outdated(struct RuckSackBundle *bundle, char *key, struct RuckSackPage *page) {
+static int add_texture_if_outdated(struct RuckSackBundle *bundle, char *key, struct RuckSackTexture *texture) {
     struct RuckSackFileEntry *entry = rucksack_bundle_find_file(bundle, key);
     if (entry) {
         long bundle_mtime = rucksack_file_mtime(entry);
@@ -194,9 +194,9 @@ static int add_page_if_outdated(struct RuckSackBundle *bundle, char *key, struct
     } else if (verbose) {
         fprintf(stderr, "New texture: %s\n", key);
     }
-    int err = rucksack_bundle_add_page(bundle, key, page);
+    int err = rucksack_bundle_add_texture(bundle, key, texture);
     if (err) {
-        snprintf(strbuf, sizeof(strbuf), "unable to add page: %s", rucksack_err_str(err));
+        snprintf(strbuf, sizeof(strbuf), "unable to add texture: %s", rucksack_err_str(err));
         return parse_error(strbuf);
     }
     return 0;
@@ -278,20 +278,23 @@ static int glob_insert_files(void) {
     return perform_glob(add_glob_match_to_bundle);
 }
 
-static int add_glob_match_to_page(char *key, char *path) {
-    image.name = path;
-    int err = rucksack_page_add_image(page, key, &image);
+static int add_glob_match_to_texture(char *key, char *path) {
+    image.path = path;
+    image.key = key;
+    image.key_size = strlen(key);
+    int err = rucksack_texture_add_image(texture, &image);
     if (err) {
-        snprintf(strbuf, sizeof(strbuf), "unable to add image to page: %s", rucksack_err_str(err));
+        snprintf(strbuf, sizeof(strbuf), "unable to add image to texture: %s", rucksack_err_str(err));
         return parse_error(strbuf);
     }
     check_latest_mtime(path);
-    image.name = NULL;
+    image.path = NULL;
+    image.key = NULL;
     return 0;
 }
 
 static int glob_insert_images(void) {
-    return perform_glob(add_glob_match_to_page);
+    return perform_glob(add_glob_match_to_texture);
 }
 
 static int on_string(struct LaxJsonContext *json, enum LaxJsonType type,
@@ -319,10 +322,10 @@ static int on_string(struct LaxJsonContext *json, enum LaxJsonType type,
         case StateTextures:
             return parse_error("expected textures to be an object, not string");
         case StateTextureName:
-            page = rucksack_page_create();
-            if (!page)
+            texture = rucksack_texture_create();
+            if (!texture)
                 return parse_error("out of memory");
-            page_key = strdup(value);
+            texture_key = strdup(value);
             state = StateExpectTextureObject;
             break;
         case StateExpectImagesObject:
@@ -331,8 +334,9 @@ static int on_string(struct LaxJsonContext *json, enum LaxJsonType type,
             return parse_error("expected globImages array, not string");
         case StateImageName:
             image.anchor = RuckSackAnchorCenter;
-            image.name = NULL;
-            image_key = strdup(value);
+            image.path = NULL;
+            image.key = strdup(value);
+            image.key_size = strlen(value);
             state = StateImageObjectBegin;
             break;
         case StateFileName:
@@ -400,10 +404,14 @@ static int on_string(struct LaxJsonContext *json, enum LaxJsonType type,
             return parse_error("expected number");
         case StateFilePropPath:
             file_path = resolve_path(value);
+            if (!file_path)
+                return parse_error("out of memory");
             state = StateFilePropName;
             break;
         case StateImagePropPath:
-            image.name = resolve_path(value);
+            image.path = resolve_path(value);
+            if (!image.path)
+                return parse_error("out of memory");
             state = StateImagePropName;
             break;
         case StateTextureProp:
@@ -513,13 +521,13 @@ static int on_number(struct LaxJsonContext *json, double x) {
         case StateTextureMaxWidth:
             if (x != (double)(int)x)
                 return parse_error("expected integer");
-            page->max_width = (int)x;
+            texture->max_width = (int)x;
             state = StateTextureProp;
             break;
         case StateTextureMaxHeight:
             if (x != (double)(int)x)
                 return parse_error("expected integer");
-            page->max_height = (int)x;
+            texture->max_height = (int)x;
             state = StateTextureProp;
             break;
         default:
@@ -536,10 +544,10 @@ static int on_primitive(struct LaxJsonContext *json, enum LaxJsonType type) {
         case StateTexturePow2:
             switch (type) {
                 case LaxJsonTypeTrue:
-                    page->pow2 = 1;
+                    texture->pow2 = 1;
                     break;
                 case LaxJsonTypeFalse:
-                    page->pow2 = 0;
+                    texture->pow2 = 0;
                     break;
                 default:
                     return parse_error("expected true or false");
@@ -549,10 +557,10 @@ static int on_primitive(struct LaxJsonContext *json, enum LaxJsonType type) {
         case StateTextureAllowRotate90:
             switch (type) {
                 case LaxJsonTypeTrue:
-                    page->allow_r90 = 1;
+                    texture->allow_r90 = 1;
                     break;
                 case LaxJsonTypeFalse:
-                    page->allow_r90 = 0;
+                    texture->allow_r90 = 0;
                     break;
                 default:
                     return parse_error("expected true or false");
@@ -645,17 +653,17 @@ static int on_end(struct LaxJsonContext *json, enum LaxJsonType type) {
         case StateDone:
             return parse_error("unexpected content after EOF");
         case StateImagePropName:
-            err = rucksack_page_add_image(page, image_key, &image);
+            err = rucksack_texture_add_image(texture, &image);
             if (err) {
-                snprintf(strbuf, sizeof(strbuf), "unable to add image to page: %s", rucksack_err_str(err));
+                snprintf(strbuf, sizeof(strbuf), "unable to add image to texture: %s", rucksack_err_str(err));
                 return parse_error(strbuf);
             }
-            check_latest_mtime(image.name);
+            check_latest_mtime(image.path);
 
-            free(image.name);
-            image.name = NULL;
-            free(image_key);
-            image_key = NULL;
+            free(image.path);
+            image.path = NULL;
+            free(image.key);
+            image.key = NULL;
 
             state = StateImageName;
             break;
@@ -677,14 +685,14 @@ static int on_end(struct LaxJsonContext *json, enum LaxJsonType type) {
             state = StateTextureProp;
             break;
         case StateTextureProp:
-            err = add_page_if_outdated(bundle, page_key, page);
+            err = add_texture_if_outdated(bundle, texture_key, texture);
             if (err) return err;
 
-            rucksack_page_destroy(page);
-            page = NULL;
+            rucksack_texture_destroy(texture);
+            texture = NULL;
 
-            free(page_key);
-            page_key = NULL;
+            free(texture_key);
+            texture_key = NULL;
 
             state = StateTextureName;
             break;

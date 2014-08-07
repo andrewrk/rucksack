@@ -70,27 +70,35 @@ static void test_texture_packing(void) {
     struct RuckSackBundle *bundle;
     ok(rucksack_bundle_open(bundle_name, &bundle));
 
-    struct RuckSackPage *page = rucksack_page_create();
-    assert(page);
+    struct RuckSackTexture *texture = rucksack_texture_create();
+    assert(texture);
 
     struct RuckSackImage img;
     img.anchor = RuckSackAnchorCenter;
 
-    img.name = "../test/file0.png";
-    ok(rucksack_page_add_image(page, "image0", &img));
+    img.path = "../test/file0.png";
+    img.key = "image0";
+    img.key_size = strlen(img.key);
+    ok(rucksack_texture_add_image(texture, &img));
 
-    img.name = "../test/file1.png";
-    ok(rucksack_page_add_image(page, "image1", &img));
+    img.path = "../test/file1.png";
+    img.key = "image1";
+    img.key_size = strlen(img.key);
+    ok(rucksack_texture_add_image(texture, &img));
 
-    img.name = "../test/file2.png";
-    ok(rucksack_page_add_image(page, "image2", &img));
+    img.path = "../test/file2.png";
+    img.key = "image2";
+    img.key_size = strlen(img.key);
+    ok(rucksack_texture_add_image(texture, &img));
 
-    img.name = "../test/file3.png";
-    ok(rucksack_page_add_image(page, "image3", &img));
+    img.path = "../test/file3.png";
+    img.key = "image3";
+    img.key_size = strlen(img.key);
+    ok(rucksack_texture_add_image(texture, &img));
 
-    ok(rucksack_bundle_add_page(bundle, "texture_foo", page));
+    ok(rucksack_bundle_add_texture(bundle, "texture_foo", texture));
 
-    rucksack_page_destroy(page);
+    rucksack_texture_destroy(texture);
 
     ok(rucksack_bundle_close(bundle));
 
@@ -100,30 +108,29 @@ static void test_texture_packing(void) {
     struct RuckSackFileEntry *entry = rucksack_bundle_find_file(bundle, "texture_foo");
     assert(entry);
 
-    struct RuckSackTexture *texture;
     ok(rucksack_file_open_texture(entry, &texture));
 
     long image_count = rucksack_texture_image_count(texture);
     assert(image_count == 4);
 
-    struct RuckSackImage *images = malloc(sizeof(struct RuckSackImage) * image_count);
-    rucksack_texture_get_images(texture, &images);
+    struct RuckSackImage **images = malloc(sizeof(struct RuckSackImage *) * image_count);
+    rucksack_texture_get_images(texture, images);
     char got_them[4];
     for (int i = 0; i < image_count; i += 1) {
-        struct RuckSackImage *image = &images[i];
-        if (strcmp(image->name, "image0") == 0) {
+        struct RuckSackImage *image = images[i];
+        if (strcmp(image->key, "image0") == 0) {
             got_them[0] = 1;
             assert(image->width == 8);
             assert(image->height == 8);
-        } else if (strcmp(image->name, "image1") == 0) {
+        } else if (strcmp(image->key, "image1") == 0) {
             got_them[1] = 1;
             assert(image->width == 16);
             assert(image->height == 16);
-        } else if (strcmp(image->name, "image2") == 0) {
+        } else if (strcmp(image->key, "image2") == 0) {
             got_them[2] = 1;
             assert(image->width == 16);
             assert(image->height == 16);
-        } else if (strcmp(image->name, "image3") == 0) {
+        } else if (strcmp(image->key, "image3") == 0) {
             got_them[3] = 1;
             assert(image->width == 8);
             assert(image->height == 8);
@@ -147,21 +154,25 @@ static void test_bundling_twice(void) {
         struct RuckSackBundle *bundle;
         ok(rucksack_bundle_open(bundle_name, &bundle));
 
-        struct RuckSackPage *page = rucksack_page_create();
-        assert(page);
+        struct RuckSackTexture *texture = rucksack_texture_create();
+        assert(texture);
 
         struct RuckSackImage img;
         img.anchor = RuckSackAnchorCenter;
 
-        img.name = "../test/radar-circle.png";
-        ok(rucksack_page_add_image(page, "radarCircle", &img));
+        img.path = "../test/radar-circle.png";
+        img.key = "radarCircle";
+        img.key_size = strlen(img.key);
+        ok(rucksack_texture_add_image(texture, &img));
 
-        img.name = "../test/arrow.png";
-        ok(rucksack_page_add_image(page, "arrow", &img));
+        img.path = "../test/arrow.png";
+        img.key = "arrow";
+        img.key_size = strlen(img.key);
+        ok(rucksack_texture_add_image(texture, &img));
 
-        ok(rucksack_bundle_add_page(bundle, "cockpit", page));
+        ok(rucksack_bundle_add_texture(bundle, "cockpit", texture));
 
-        rucksack_page_destroy(page);
+        rucksack_texture_destroy(texture);
 
         ok(rucksack_bundle_close(bundle));
     }

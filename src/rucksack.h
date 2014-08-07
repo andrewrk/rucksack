@@ -27,9 +27,8 @@ enum RuckSackError {
 };
 
 struct RuckSackBundle {
-    // the directory to do all path searches relative to
+    /* the directory to do all path searches relative to */
     const char *cwd;
-
 };
 
 struct RuckSackFileEntry;
@@ -50,42 +49,43 @@ enum RuckSackAnchor {
 };
 
 struct RuckSackImage {
-    // write API: this is the path
-    // read API: this is the key
-    char *name;
+    /* when writing, set this value. when reading it is set automatically. */
+    char *key;
+    /* key is an array of bytes, not a null-delimited string.*/
+    int key_size;
+    /* when writing, set this value. when reading, it is NULL. */
+    char *path;
     enum RuckSackAnchor anchor;
     int anchor_x;
     int anchor_y;
 
-    // assigned after a call to rucksack_bundle_add_page and also populated
-    // when reading a page from a bundle
+    /* assigned after a call to rucksack_bundle_add_texture and also populated
+     * when reading a texture from a bundle */
     int width;
     int height;
 
     int x;
     int y;
 
-    // whether this image is rotated 90 degrees
+    /* whether this image is rotated 90 degrees */
     char r90;
 };
 
-// A RuckSackPage contains multiple images. Also known as texture or
-// spritesheet. The size of this struct is not part of the public ABI.
-// Use rucksack_page_create to make one.
-struct RuckSackPage {
-    // defaults to 1024x1024
+/* A RuckSackTexture contains multiple images. Also known as a spritesheet.
+ * The size of this struct is not part of the public ABI.
+ * Use rucksack_texture_create to make one.*/
+struct RuckSackTexture {
+    /* defaults to 1024x1024 */
     int max_width;
     int max_height;
-    // whether powers of 2 are required. Defaults to 1.
+    /* whether powers of 2 are required. Defaults to 1. */
     char pow2;
-    // normally rucksack is free to rotate images 90 degrees if it would
-    // provide tighter texture packing. Set this field to 0 to prevent this.
+    /* normally rucksack is free to rotate images 90 degrees if it would
+     * provide tighter texture packing. Set this field to 0 to prevent this. */
     char allow_r90;
 };
 
 struct RuckSackOutStream;
-
-struct RuckSackTexture;
 
 /* common API */
 void rucksack_init(void);
@@ -99,13 +99,13 @@ int rucksack_bundle_open(const char *bundle_path, struct RuckSackBundle **bundle
 int rucksack_bundle_close(struct RuckSackBundle *bundle);
 
 /* write API */
-struct RuckSackPage *rucksack_page_create(void);
-int rucksack_page_add_image(struct RuckSackPage *page, const char *key,
-        struct RuckSackImage *image);
-void rucksack_page_destroy(struct RuckSackPage *page);
+struct RuckSackTexture *rucksack_texture_create(void);
 
-int rucksack_bundle_add_page(struct RuckSackBundle *bundle, const char *key,
-        struct RuckSackPage *page);
+int rucksack_texture_add_image(struct RuckSackTexture *texture, struct RuckSackImage *image);
+void rucksack_texture_destroy(struct RuckSackTexture *texture);
+
+int rucksack_bundle_add_texture(struct RuckSackBundle *bundle, const char *key,
+        struct RuckSackTexture *texture);
 int rucksack_bundle_add_file(struct RuckSackBundle *bundle, const char *key,
         const char *file_name);
 
@@ -130,12 +130,12 @@ int rucksack_file_read(struct RuckSackFileEntry *entry, unsigned char *buffer);
 
 int rucksack_file_open_texture(struct RuckSackFileEntry *entry, struct RuckSackTexture **texture);
 void rucksack_texture_close(struct RuckSackTexture *texture);
-// get the size of the image data for this texture
+/* get the size of the image data for this texture */
 long rucksack_texture_size(struct RuckSackTexture *texture);
-// get the image data for this texture
+/* get the image data for this texture */
 int rucksack_texture_read(struct RuckSackTexture *texture, unsigned char *buffer);
 
-// image metadata
+/* image metadata */
 long rucksack_texture_image_count(struct RuckSackTexture *texture);
 void rucksack_texture_get_images(struct RuckSackTexture *texture,
         struct RuckSackImage **images);

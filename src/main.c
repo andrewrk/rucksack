@@ -42,6 +42,7 @@ enum State {
     StateTextureMaxWidth,
     StateTextureMaxHeight,
     StateTexturePow2,
+    StateTextureAllowRotate90,
     StateExpectFilesObject,
     StateFileName,
     StateFileObjectBegin,
@@ -75,6 +76,7 @@ static const char *STATE_STR[] = {
     "StateTextureMaxWidth",
     "StateTextureMaxHeight",
     "StateTexturePow2",
+    "StateTextureAllowRotate90",
     "StateExpectFilesObject",
     "StateFileName",
     "StateFileObjectBegin",
@@ -371,6 +373,8 @@ static int on_string(struct LaxJsonContext *json, enum LaxJsonType type,
                 state = StateTextureMaxHeight;
             } else if (strcmp(value, "pow2") == 0) {
                 state = StateTexturePow2;
+            } else if (strcmp(value, "allowRotate90") == 0) {
+                state = StateTextureAllowRotate90;
             } else {
                 snprintf(strbuf, sizeof(strbuf), "unknown texture property: %s", value);
                 return parse_error(strbuf);
@@ -463,6 +467,19 @@ static int on_primitive(struct LaxJsonContext *json, enum LaxJsonType type) {
                     break;
                 case LaxJsonTypeFalse:
                     page->pow2 = 0;
+                    break;
+                default:
+                    return parse_error("expected true or false");
+            }
+            state = StateTextureProp;
+            break;
+        case StateTextureAllowRotate90:
+            switch (type) {
+                case LaxJsonTypeTrue:
+                    page->allow_r90 = 1;
+                    break;
+                case LaxJsonTypeFalse:
+                    page->allow_r90 = 0;
                     break;
                 default:
                     return parse_error("expected true or false");

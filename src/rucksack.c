@@ -551,6 +551,7 @@ struct RuckSackPage *rucksack_page_create(void) {
     page->max_width = 1024;
     page->max_height = 1024;
     page->pow2 = 1;
+    page->allow_r90 = 1;
     return &p->externals;
 }
 
@@ -781,14 +782,16 @@ static int do_maxrect_bssf(struct RuckSackPage *page) {
             }
 
             // calculate short side fit with rotating 90 degrees
-            w_len = free_r->w - image->height;
-            h_len = free_r->h - image->width;
-            short_side = (w_len < h_len) ? w_len : h_len;
-            can_fit = w_len > 0 && h_len > 0;
-            if (can_fit && short_side < best_short_side) {
-                best_short_side = short_side;
-                best_rect = free_r;
-                best_short_side_is_r90 = 1;
+            if (page->allow_r90) {
+                w_len = free_r->w - image->height;
+                h_len = free_r->h - image->width;
+                short_side = (w_len < h_len) ? w_len : h_len;
+                can_fit = w_len > 0 && h_len > 0;
+                if (can_fit && short_side < best_short_side) {
+                    best_short_side = short_side;
+                    best_rect = free_r;
+                    best_short_side_is_r90 = 1;
+                }
             }
         }
 

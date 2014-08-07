@@ -90,9 +90,21 @@ int main() {
   // spritesheet generation
   textures: {
     texture1Name: {
+      // 1024x1024 is the default.
       maxWidth: 1024,
       maxHeight: 1024,
+
+      // By default rucksack enforces that the width and height of a texture
+      // will be a power of 2. Set pow2 to false to disable this.
       pow2: true,
+
+      // rucksack efficiently packs textures by sometimes rotating images
+      // to make them fit better, and you can compensate for this by using
+      // different UV coords when the images are rotated. If you for some
+      // reason want to disable this feature, you can set allowRotate90 to
+      // false.
+      allowRotate90: true,
+
       images: {
         image1Name: {
           // can be any image format supported by FreeImage

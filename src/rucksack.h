@@ -64,15 +64,23 @@ struct RuckSackImage {
 
     int x;
     int y;
+
+    // whether this image is rotated 90 degrees
     char r90;
 };
 
-// a page contains multiple images. also known as texture or spritesheet
+// A RuckSackPage contains multiple images. Also known as texture or
+// spritesheet. The size of this struct is not part of the public ABI.
+// Use rucksack_page_create to make one.
 struct RuckSackPage {
+    // defaults to 1024x1024
     int max_width;
     int max_height;
-    // whether powers of 2 are required
+    // whether powers of 2 are required. Defaults to 1.
     char pow2;
+    // normally rucksack is free to rotate images 90 degrees if it would
+    // provide tighter texture packing. Set this field to 0 to prevent this.
+    char allow_r90;
 };
 
 struct RuckSackOutStream;
@@ -92,6 +100,8 @@ int rucksack_bundle_close(struct RuckSackBundle *bundle);
 
 /* write API */
 struct RuckSackPage *rucksack_page_create(void);
+int rucksack_page_add_image(struct RuckSackPage *page, const char *key,
+        struct RuckSackImage *image);
 void rucksack_page_destroy(struct RuckSackPage *page);
 
 int rucksack_bundle_add_page(struct RuckSackBundle *bundle, const char *key,
@@ -101,9 +111,6 @@ int rucksack_bundle_add_file(struct RuckSackBundle *bundle, const char *key,
 
 int rucksack_bundle_add_stream(struct RuckSackBundle *bundle, const char *key,
         long size_guess, struct RuckSackOutStream **stream);
-
-int rucksack_page_add_image(struct RuckSackPage *page, const char *key,
-        struct RuckSackImage *image);
 
 int rucksack_stream_write(struct RuckSackOutStream *stream, const void *ptr,
         long count);

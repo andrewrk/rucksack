@@ -141,7 +141,7 @@ static void test_texture_packing(void) {
     assert(got_them[2]);
     assert(got_them[3]);
 
-    rucksack_texture_close(texture);
+    rucksack_texture_destroy(texture);
 
     ok(rucksack_bundle_close(bundle));
 }

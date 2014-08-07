@@ -193,7 +193,7 @@ static int add_texture_if_outdated(struct RuckSackBundle *bundle, char *key,
             bundle_texture->max_height == texture->max_height &&
             bundle_texture->allow_r90 == texture->allow_r90 &&
             bundle_texture->allow_r90 == texture->allow_r90;
-        rucksack_texture_close(bundle_texture);
+        rucksack_texture_destroy(bundle_texture);
         if (up_to_date) {
             if (verbose)
                 fprintf(stderr, "Texture up to date: %s\n", key);
@@ -915,7 +915,7 @@ static int command_cat(char *arg0, int argc, char *argv[]) {
             return 1;
         }
 
-        rucksack_texture_close(texture);
+        rucksack_texture_destroy(texture);
     } else {
         long size = rucksack_file_size(entry);
 

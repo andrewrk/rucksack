@@ -4,6 +4,8 @@
  * added a setting which allows preventing rotating images 90 degrees.
  * ability to glob for images in a texture.
  * (API breaking) rename all `page` functions to `texture`.
+ * (API breaking) rucksack_texture_close removed. Use rucksack_texture_destroy
+   instead.
  * (API breaking) remove `RuckSackImage` property `name` in favor of `key`,
    `key_size`, and `path`.
  * (format breaking) update bundle format

@@ -133,8 +133,9 @@ const char *rucksack_file_name(struct RuckSackFileEntry *entry);
 long rucksack_file_mtime(struct RuckSackFileEntry *entry);
 int rucksack_file_read(struct RuckSackFileEntry *entry, unsigned char *buffer);
 
+/* call rucksack_texture_destroy when done */
 int rucksack_file_open_texture(struct RuckSackFileEntry *entry, struct RuckSackTexture **texture);
-void rucksack_texture_close(struct RuckSackTexture *texture);
+
 /* get the size of the image data for this texture */
 long rucksack_texture_size(struct RuckSackTexture *texture);
 /* get the image data for this texture */

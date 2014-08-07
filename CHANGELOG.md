@@ -11,6 +11,7 @@
    - texture header includes UUID to identify it as a texture
    - texture header includes the properties that were used to generate it
    - image header uses only 1 byte for the r90 boolean
+ * fix not updating bundle when texture properties changed from manifest json
 
 ### 1.0.1
 

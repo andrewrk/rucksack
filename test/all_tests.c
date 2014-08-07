@@ -248,6 +248,48 @@ static void test_empty_bundle(void) {
     ok(rucksack_bundle_close(bundle));
 }
 
+static void test_non_default_texture_props(void) {
+    const char *bundle_name = "test.bundle";
+    remove(bundle_name);
+
+    struct RuckSackBundle *bundle;
+    ok(rucksack_bundle_open(bundle_name, &bundle));
+
+    struct RuckSackTexture *texture = rucksack_texture_create();
+    assert(texture);
+    texture->max_width = 256;
+    texture->max_height = 128;
+    texture->pow2 = 0;
+    texture->allow_r90 = 0;
+
+    struct RuckSackImage img;
+    img.anchor = RuckSackAnchorCenter;
+    img.path = "../test/file0.png";
+    img.key = "image0";
+    img.key_size = strlen(img.key);
+    ok(rucksack_texture_add_image(texture, &img));
+    ok(rucksack_bundle_add_texture(bundle, "texture_foo", texture));
+    rucksack_texture_destroy(texture);
+
+    ok(rucksack_bundle_close(bundle));
+
+    // now make sure the properties persisted
+    ok(rucksack_bundle_open(bundle_name, &bundle));
+    struct RuckSackFileEntry *entry = rucksack_bundle_find_file(bundle, "texture_foo");
+    assert(entry);
+
+    ok(rucksack_file_open_texture(entry, &texture));
+
+    long image_count = rucksack_texture_image_count(texture);
+    assert(image_count == 1);
+
+    assert(texture->max_width == 256);
+    assert(texture->max_height == 128);
+    assert(texture->pow2 == 0);
+    assert(texture->allow_r90 == 0);
+
+    ok(rucksack_bundle_close(bundle));
+}
 
 struct Test {
     const char *name;
@@ -262,6 +304,7 @@ static struct Test tests[] = {
     {"add 3 files", test_three_files},
     {"add a file larger than 16KB", test_16kb_file},
     {"write to an empty bundle", test_empty_bundle},
+    {"non-default texture properties", test_non_default_texture_props},
     {NULL, NULL},
 };
 

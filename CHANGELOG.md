@@ -6,6 +6,11 @@
  * (API breaking) rename all `page` functions to `texture`.
  * (API breaking) remove `RuckSackImage` property `name` in favor of `key`,
    `key_size`, and `path`.
+ * (format breaking) update bundle format
+   - include bundle version number
+   - texture header includes UUID to identify it as a texture
+   - texture header includes the properties that were used to generate it
+   - image header uses only 1 byte for the r90 boolean
 
 ### 1.0.1
 

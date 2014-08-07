@@ -18,6 +18,12 @@
   ],
   textures: {
     cockpit: {
+      globImages: [
+        {
+          glob: "file*.png",
+          anchor: "topleft",
+        },
+      ],
       images: {
         arrow: {
           path: "arrow.png",

@@ -72,6 +72,8 @@ int main() {
 ### Example
 
 ```js
+// comments are OK :)
+// single quotes, double quotes, and no quotes are OK
 {
   // one-off files you want to directly save into the bundle
   files: {
@@ -105,6 +107,20 @@ int main() {
       // false.
       allowRotate90: true,
 
+      globImages: [
+        {
+          path: "path/to/dir",
+          glob: "*",
+          prefix: "abc_", // prepended to the key
+
+          // can be any of these strings:
+          // "top", "left", "bottom", "right"
+          // "topleft", "topright", "bottomleft", "bottomright"
+          // "center"
+          // or it can be an object like this: {x: 13, y: 19}
+          anchor: "center",
+        },
+      ],
       images: {
         image1Name: {
           // can be any image format supported by FreeImage

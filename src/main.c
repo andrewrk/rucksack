@@ -29,6 +29,7 @@ enum State {
     StateTextures,
     StateTextureName,
     StateExpectImagesObject,
+    StateExpectGlobImagesArray,
     StateImageName,
     StateImageObjectBegin,
     StateImagePropName,
@@ -54,6 +55,11 @@ enum State {
     StateGlobValueGlob,
     StateGlobValuePrefix,
     StateGlobValuePath,
+    StateGlobImageObject,
+    StateGlobImageObjectProp,
+    StateGlobImageValueGlob,
+    StateGlobImageValuePrefix,
+    StateGlobImageValuePath,
 };
 
 static const char *STATE_STR[] = {
@@ -63,6 +69,7 @@ static const char *STATE_STR[] = {
     "StateTextures",
     "StateTextureName",
     "StateExpectImagesObject",
+    "StateExpectGlobImagesArray",
     "StateImageName",
     "StateImageObjectBegin",
     "StateImagePropName",
@@ -88,6 +95,11 @@ static const char *STATE_STR[] = {
     "StateGlobValueGlob",
     "StateGlobValuePrefix",
     "StateGlobValuePath",
+    "StateGlobImageObject",
+    "StateGlobImageObjectProp",
+    "StateGlobImageValueGlob",
+    "StateGlobImageValuePrefix",
+    "StateGlobImageValuePath",
 };
 
 static enum State state;
@@ -111,6 +123,9 @@ static char *path_prefix = ".";
 static char *glob_glob = NULL;
 static char *glob_path = NULL;
 static char *glob_prefix = NULL;
+
+// after collecting the anchor property, sets state to this one
+static enum State anchor_next_state;
 
 static char debug_mode = 0;
 static char verbose = 0;
@@ -212,7 +227,7 @@ static int add_file_if_outdated(struct RuckSackBundle *bundle, char *key, char *
     return 0;
 }
 
-static int glob_insert_files(void) {
+static int perform_glob(int (*match_callback)(char *key, char *path)) {
     char *use_glob_str = glob_glob ? glob_glob : "*";
     char *use_glob_path = glob_path ? glob_path : "";
     char *use_glob_prefix = glob_prefix ? glob_prefix : "";
@@ -246,13 +261,37 @@ static int glob_insert_files(void) {
         path_relative(strbuf3, path, strbuf2);
 
         snprintf(strbuf4, sizeof(strbuf4), "%s%s", use_glob_prefix, strbuf2);
-        err = add_file_if_outdated(bundle, strbuf4, path);
+        err = match_callback(strbuf4, path);
         if (err) return err;
     }
 
     globfree(&glob_result);
 
     return 0;
+}
+
+static int add_glob_match_to_bundle(char *key, char *path) {
+    return add_file_if_outdated(bundle, key, path);
+}
+
+static int glob_insert_files(void) {
+    return perform_glob(add_glob_match_to_bundle);
+}
+
+static int add_glob_match_to_page(char *key, char *path) {
+    image.name = path;
+    int err = rucksack_page_add_image(page, key, &image);
+    if (err) {
+        snprintf(strbuf, sizeof(strbuf), "unable to add image to page: %s", rucksack_err_str(err));
+        return parse_error(strbuf);
+    }
+    check_latest_mtime(path);
+    image.name = NULL;
+    return 0;
+}
+
+static int glob_insert_images(void) {
+    return perform_glob(add_glob_match_to_page);
 }
 
 static int on_string(struct LaxJsonContext *json, enum LaxJsonType type,
@@ -288,6 +327,8 @@ static int on_string(struct LaxJsonContext *json, enum LaxJsonType type,
             break;
         case StateExpectImagesObject:
             return parse_error("expected images object, not string");
+        case StateExpectGlobImagesArray:
+            return parse_error("expected globImages array, not string");
         case StateImageName:
             image.anchor = RuckSackAnchorCenter;
             image.name = NULL;
@@ -311,6 +352,7 @@ static int on_string(struct LaxJsonContext *json, enum LaxJsonType type,
         case StateImagePropName:
             if (strcmp(value, "anchor") == 0) {
                 state = StateImagePropAnchor;
+                anchor_next_state = StateImagePropName;
             } else if (strcmp(value, "path") == 0) {
                 state = StateImagePropPath;
             } else {
@@ -341,7 +383,7 @@ static int on_string(struct LaxJsonContext *json, enum LaxJsonType type,
                 snprintf(strbuf, sizeof(strbuf), "unknown anchor value: %s", value);
                 return parse_error(strbuf);
             }
-            state = StateImagePropName;
+            state = anchor_next_state;
             break;
         case StateImagePropAnchorObject:
             if (strcmp(value, "x") == 0) {
@@ -367,6 +409,8 @@ static int on_string(struct LaxJsonContext *json, enum LaxJsonType type,
         case StateTextureProp:
             if (strcmp(value, "images") == 0) {
                 state = StateExpectImagesObject;
+            } else if (strcmp(value, "globImages") == 0) {
+                state = StateExpectGlobImagesArray;
             } else if (strcmp(value, "maxWidth") == 0) {
                 state = StateTextureMaxWidth;
             } else if (strcmp(value, "maxHeight") == 0) {
@@ -388,7 +432,22 @@ static int on_string(struct LaxJsonContext *json, enum LaxJsonType type,
             } else if (strcmp(value, "path") == 0) {
                 state = StateGlobValuePath;
             } else {
-                snprintf(strbuf, sizeof(strbuf), "unknown glob property: %s", value);
+                snprintf(strbuf, sizeof(strbuf), "unknown globFiles property: %s", value);
+                return parse_error(strbuf);
+            }
+            break;
+        case StateGlobImageObjectProp:
+            if (strcmp(value, "glob") == 0) {
+                state = StateGlobImageValueGlob;
+            } else if (strcmp(value, "prefix") == 0) {
+                state = StateGlobImageValuePrefix;
+            } else if (strcmp(value, "path") == 0) {
+                state = StateGlobImageValuePath;
+            } else if (strcmp(value, "anchor") == 0) {
+                state = StateImagePropAnchor;
+                anchor_next_state = StateGlobImageObjectProp;
+            } else {
+                snprintf(strbuf, sizeof(strbuf), "unknown globImages property: %s", value);
                 return parse_error(strbuf);
             }
             break;
@@ -403,6 +462,18 @@ static int on_string(struct LaxJsonContext *json, enum LaxJsonType type,
         case StateGlobValuePrefix:
             glob_prefix = strdup(value);
             state = StateGlobObjectProp;
+            break;
+        case StateGlobImageValueGlob:
+            glob_glob = strdup(value);
+            state = StateGlobImageObjectProp;
+            break;
+        case StateGlobImageValuePath:
+            glob_path = strdup(value);
+            state = StateGlobImageObjectProp;
+            break;
+        case StateGlobImageValuePrefix:
+            glob_prefix = strdup(value);
+            state = StateGlobImageObjectProp;
             break;
         default:
             return parse_error("unexpected string");
@@ -423,6 +494,8 @@ static int on_number(struct LaxJsonContext *json, double x) {
             return parse_error("expected textures to be an object, not number");
         case StateExpectImagesObject:
             return parse_error("expected image object, not number");
+        case StateExpectGlobImagesArray:
+            return parse_error("expected globImages array, not number");
         case StateImageObjectBegin:
             return parse_error("expected image properties object, not number");
         case StateImagePropAnchor:
@@ -501,6 +574,9 @@ static int on_begin(struct LaxJsonContext *json, enum LaxJsonType type) {
             case StateExpectGlobArray:
                 state = StateGlobObject;
                 break;
+            case StateExpectGlobImagesArray:
+                state = StateGlobImageObject;
+                break;
             default:
                 return parse_error("unexpected array");
         }
@@ -538,6 +614,14 @@ static int on_begin(struct LaxJsonContext *json, enum LaxJsonType type) {
                 glob_glob = NULL;
                 glob_path = NULL;
                 glob_prefix = NULL;
+                break;
+            case StateGlobImageObject:
+                state = StateGlobImageObjectProp;
+                glob_glob = NULL;
+                glob_path = NULL;
+                glob_prefix = NULL;
+                // image is used to store anchor information
+                image.anchor = RuckSackAnchorCenter;
                 break;
             default:
                 return parse_error("unexpected object");
@@ -587,7 +671,7 @@ static int on_end(struct LaxJsonContext *json, enum LaxJsonType type) {
             state = StateFileName;
             break;
         case StateImagePropAnchorObject:
-            state = StateImagePropName;
+            state = anchor_next_state;
             break;
         case StateImageName:
             state = StateTextureProp;
@@ -612,10 +696,21 @@ static int on_end(struct LaxJsonContext *json, enum LaxJsonType type) {
             free(glob_prefix);
             state = StateGlobObject;
             break;
+        case StateGlobImageObjectProp:
+            err = glob_insert_images();
+            if (err) return err;
+            free(glob_glob);
+            free(glob_path);
+            free(glob_prefix);
+            state = StateGlobImageObject;
+            break;
         case StateTextureName:
         case StateGlobObject:
         case StateFileName:
             state = StateTopLevelProp;
+            break;
+        case StateGlobImageObject:
+            state = StateTextureProp;
             break;
         default:
             return parse_error("unexpected end of object or array");

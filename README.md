@@ -152,8 +152,9 @@ below.
     Offset | Contents
     -------+---------
          0 | 16 byte UUID - 60 70 c8 99 82 a1 41 84 89 51 08 c9 1c c9 b6 20
-        16 | uint32be offset of first header entry from file start
-        20 | uint32be number of header entries
+        16 | uint32be file format version. bumped when incompatible changes made.
+        20 | uint32be offset of first header entry from file start
+        24 | uint32be number of header entries
 
 ### Header Entry Format
 
@@ -167,14 +168,18 @@ below.
         32 | uint32be key size in bytes
         36 | key bytes
 
-
 ### Texture Format
 
     Offset | Contents
     -------+---------
-         0 | uint32be offset of the actual image data from 0 in this struct
-         4 | uint32be number of images in this texture
-         8 | uint32be offset of the first image entry from 0 in this struct
+         0 | 16 byte UUID 0e b1 4c 84 47 4c b3 ad a6 bd 93 e4 be a5 46 ba
+        16 | uint32be offset of the actual image data from 0 in this struct
+        20 | uint32be number of images in this texture
+        24 | uint32be offset of the first image entry from 0 in this struct
+        28 | uint32be max_width used when creating this texture
+        32 | uint32be max_height used when creating this texture
+        36 | uint8 pow2 value used when creating this texture
+        37 | uint8 allow_r90 value used when creating this texture
 
 #### Image Entry Format
 
@@ -188,8 +193,8 @@ below.
         20 | uint32be unrotated image width
         24 | uint32be unrotated image height
         28 | uint8 boolean whether the image is rotated clockwise 90 degrees
-        32 | uint32be key size in bytes
-        36 | key bytes
+        29 | uint32be key size in bytes
+        33 | key bytes
 
 ## Projects Using rucksack
 

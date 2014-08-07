@@ -24,12 +24,21 @@
 #define MIN(x, y) ((x) < (y) ? (x) : (y))
 
 static const char *BUNDLE_UUID = "\x60\x70\xc8\x99\x82\xa1\x41\x84\x89\x51\x08\xc9\x1c\xc9\xb6\x20";
+static const char *TEXTURE_UUID = "\x0e\xb1\x4c\x84\x47\x4c\xb3\xad\xa6\xbd\x93\xe4\xbe\xa5\x46\xba";
+
+static const int BUNDLE_VERSION = 1;
+static const int MAIN_HEADER_LEN = 28;
+static const int HEADER_ENTRY_LEN = 36; // not taking into account key bytes
+static const int TEXTURE_HEADER_LEN = 38;
+static const int IMAGE_HEADER_LEN = 33; // not taking into account key bytes
 
 static const char *ERROR_STR[] = {
     "",
     "out of memory",
     "problem accessing file",
     "invalid bundle format",
+    "bundle version mismatch",
+    "bundle is an empty file",
     "invalid anchor enum value",
     "cannot fit all images into texture",
     "image has no pixels",
@@ -50,6 +59,7 @@ struct RuckSackFileEntry {
 
 struct RuckSackBundlePrivate {
     struct RuckSackBundle externals;
+
     FILE *f;
 
     long int first_header_offset;
@@ -198,20 +208,24 @@ static int read_header(struct RuckSackBundlePrivate *b) {
     if (fseek(f, 0, SEEK_SET))
         return RuckSackErrorFileAccess;
 
-    unsigned char buf[36];
-    long int amt_read = fread(buf, 1, 24, f);
+    unsigned char buf[MAX(HEADER_ENTRY_LEN, MAIN_HEADER_LEN)];
+    long int amt_read = fread(buf, 1, MAIN_HEADER_LEN, f);
 
     if (amt_read == 0)
         return RuckSackErrorEmptyFile;
 
-    if (amt_read != 24)
+    if (amt_read != MAIN_HEADER_LEN)
         return RuckSackErrorInvalidFormat;
 
     if (memcmp(BUNDLE_UUID, buf, 16) != 0)
         return RuckSackErrorInvalidFormat;
 
-    b->first_header_offset = read_uint32be(&buf[16]);
-    b->header_entry_count = read_uint32be(&buf[20]);
+    int bundle_version = read_uint32be(&buf[16]);
+    if (bundle_version != BUNDLE_VERSION)
+        return RuckSackErrorWrongVersion;
+
+    b->first_header_offset = read_uint32be(&buf[20]);
+    b->header_entry_count = read_uint32be(&buf[24]);
     b->header_entry_mem_size = alloc_count(b->header_entry_count);
     b->entries = calloc(b->header_entry_mem_size, sizeof(struct RuckSackFileEntry));
 
@@ -225,8 +239,8 @@ static int read_header(struct RuckSackBundlePrivate *b) {
     for (int i = 0; i < b->header_entry_count; i += 1) {
         if (fseek(f, header_offset, SEEK_SET))
             return RuckSackErrorFileAccess;
-        amt_read = fread(buf, 1, 36, f);
-        if (amt_read != 36)
+        amt_read = fread(buf, 1, HEADER_ENTRY_LEN, f);
+        if (amt_read != HEADER_ENTRY_LEN)
             return RuckSackErrorInvalidFormat;
         long int entry_size = read_uint32be(&buf[0]);
         header_offset += entry_size;
@@ -245,7 +259,7 @@ static int read_header(struct RuckSackBundlePrivate *b) {
         entry->key[entry->key_size] = 0;
         entry->b = b;
 
-        b->headers_byte_count += 36 + entry->key_size;
+        b->headers_byte_count += HEADER_ENTRY_LEN + entry->key_size;
 
         if (!b->last_entry || entry->offset > b->last_entry->offset)
             b->last_entry = entry;
@@ -387,7 +401,7 @@ static void allocate_file(struct RuckSackBundlePrivate *b, long int size,
         b->last_entry = entry;
     } else {
         // this is the first entry in the bundle
-        b->first_file_offset = alloc_size(36 + entry->key_size) + b->first_header_offset;
+        b->first_file_offset = alloc_size(HEADER_ENTRY_LEN + entry->key_size) + b->first_header_offset;
         entry->offset = b->first_file_offset;
         b->first_entry = entry;
         b->last_entry = entry;
@@ -424,12 +438,13 @@ static int write_header(struct RuckSackBundlePrivate *b) {
     if (fseek(f, 0, SEEK_SET))
         return RuckSackErrorFileAccess;
 
-    unsigned char buf[36];
+    unsigned char buf[MAX(MAIN_HEADER_LEN, HEADER_ENTRY_LEN)];
     memcpy(buf, BUNDLE_UUID, 16);
-    write_uint32be(&buf[16], b->first_header_offset);
-    write_uint32be(&buf[20], b->header_entry_count);
-    long int amt_written = fwrite(buf, 1, 24, f);
-    if (amt_written != 24)
+    write_uint32be(&buf[16], BUNDLE_VERSION);
+    write_uint32be(&buf[20], b->first_header_offset);
+    write_uint32be(&buf[24], b->header_entry_count);
+    long int amt_written = fwrite(buf, 1, MAIN_HEADER_LEN, f);
+    if (amt_written != MAIN_HEADER_LEN)
         return RuckSackErrorFileAccess;
 
     long int allocated_header_bytes = b->first_file_offset - b->first_header_offset;
@@ -451,14 +466,14 @@ static int write_header(struct RuckSackBundlePrivate *b) {
 
     for (int i = 0; i < b->header_entry_count; i += 1) {
         struct RuckSackFileEntry *entry = &b->entries[i];
-        write_uint32be(&buf[0], 36 + entry->key_size);
+        write_uint32be(&buf[0], HEADER_ENTRY_LEN + entry->key_size);
         write_uint64be(&buf[4], entry->offset);
         write_uint64be(&buf[12], entry->size);
         write_uint64be(&buf[20], entry->allocated_size);
         write_uint32be(&buf[28], entry->mtime);
         write_uint32be(&buf[32], entry->key_size);
-        amt_written = fwrite(buf, 1, 36, f);
-        if (amt_written != 36)
+        amt_written = fwrite(buf, 1, HEADER_ENTRY_LEN, f);
+        if (amt_written != HEADER_ENTRY_LEN)
             return RuckSackErrorFileAccess;
         amt_written = fwrite(entry->key, 1, entry->key_size, f);
         if (amt_written != entry->key_size)
@@ -469,8 +484,8 @@ static int write_header(struct RuckSackBundlePrivate *b) {
 }
 
 static void init_new_bundle(struct RuckSackBundlePrivate *b) {
-    b->first_header_offset = 24;
-    long int allocated_header_bytes = alloc_size(36);
+    b->first_header_offset = MAIN_HEADER_LEN;
+    long int allocated_header_bytes = alloc_size(HEADER_ENTRY_LEN);
     b->first_file_offset = b->first_header_offset + allocated_header_bytes;
 }
 
@@ -1024,7 +1039,7 @@ int rucksack_bundle_add_texture(struct RuckSackBundle *bundle, const char *key,
     for (int i = 0; i < p->images_count; i += 1) {
         struct RuckSackImagePrivate *img = &p->images[i];
         struct RuckSackImage *image = &img->externals;
-        total_image_entries_size += 36 + image->key_size;
+        total_image_entries_size += HEADER_ENTRY_LEN + image->key_size;
     }
     long image_data_offset = 12 + total_image_entries_size;
     long total_size = image_data_offset + data_size;
@@ -1034,12 +1049,17 @@ int rucksack_bundle_add_texture(struct RuckSackBundle *bundle, const char *key,
     if (err)
         return err;
 
-    unsigned char buf[36];
-    write_uint32be(&buf[0], image_data_offset);
-    write_uint32be(&buf[4], p->images_count);
-    write_uint32be(&buf[8], 12);
+    unsigned char buf[MAX(TEXTURE_HEADER_LEN, IMAGE_HEADER_LEN)];
+    memcpy(&buf[0], TEXTURE_UUID, 16);
+    write_uint32be(&buf[16], image_data_offset);
+    write_uint32be(&buf[20], p->images_count);
+    write_uint32be(&buf[24], TEXTURE_HEADER_LEN);
+    write_uint32be(&buf[28], texture->max_width);
+    write_uint32be(&buf[32], texture->max_height);
+    buf[36] = texture->pow2;
+    buf[37] = texture->allow_r90;
 
-    err = rucksack_stream_write(stream, buf, 12);
+    err = rucksack_stream_write(stream, buf, TEXTURE_HEADER_LEN);
     if (err)
         return err;
 
@@ -1047,7 +1067,7 @@ int rucksack_bundle_add_texture(struct RuckSackBundle *bundle, const char *key,
         struct RuckSackImagePrivate *img = &p->images[i];
         struct RuckSackImage *image = &img->externals;
 
-        write_uint32be(&buf[0], 36 + image->key_size);
+        write_uint32be(&buf[0], IMAGE_HEADER_LEN + image->key_size);
         write_uint32be(&buf[4], image->anchor_x);
         write_uint32be(&buf[8], image->anchor_y);
         write_uint32be(&buf[12], image->x);
@@ -1055,9 +1075,9 @@ int rucksack_bundle_add_texture(struct RuckSackBundle *bundle, const char *key,
         write_uint32be(&buf[20], image->width);
         write_uint32be(&buf[24], image->height);
         buf[28] = image->r90;
-        write_uint32be(&buf[32], image->key_size);
+        write_uint32be(&buf[29], image->key_size);
 
-        err = rucksack_stream_write(stream, buf, 36);
+        err = rucksack_stream_write(stream, buf, IMAGE_HEADER_LEN);
         if (err)
             return err;
 
@@ -1312,17 +1332,25 @@ int rucksack_file_open_texture(struct RuckSackFileEntry *entry,
         return RuckSackErrorFileAccess;
     }
 
-    unsigned char buf[36];
-    long amt_read = fread(buf, 1, 12, b->f);
-    if (amt_read != 12) {
+    unsigned char buf[MAX(TEXTURE_HEADER_LEN, IMAGE_HEADER_LEN)];
+    long amt_read = fread(buf, 1, TEXTURE_HEADER_LEN, b->f);
+    if (amt_read != TEXTURE_HEADER_LEN) {
         rucksack_texture_close(texture);
         return RuckSackErrorFileAccess;
     }
 
-    t->pixel_data_offset = read_uint32be(&buf[0]);
+    if (memcmp(TEXTURE_UUID, buf, 16) != 0)
+        return RuckSackErrorInvalidFormat;
+
+    t->pixel_data_offset = read_uint32be(&buf[16]);
     t->pixel_data_size = entry->size - t->pixel_data_offset;
-    t->images_count = read_uint32be(&buf[4]);
-    long offset_to_first_img = read_uint32be(&buf[8]);
+    t->images_count = read_uint32be(&buf[20]);
+    long offset_to_first_img = read_uint32be(&buf[24]);
+
+    texture->max_width = read_uint32be(&buf[28]);
+    texture->max_height = read_uint32be(&buf[32]);
+    texture->pow2 = buf[36];
+    texture->allow_r90 = buf[37];
 
     t->images = calloc(t->images_count, sizeof(struct RuckSackImagePrivate));
 
@@ -1342,8 +1370,8 @@ int rucksack_file_open_texture(struct RuckSackFileEntry *entry,
             return RuckSackErrorFileAccess;
         }
 
-        long amt_read = fread(buf, 1, 36, b->f);
-        if (amt_read != 36) {
+        long amt_read = fread(buf, 1, IMAGE_HEADER_LEN, b->f);
+        if (amt_read != IMAGE_HEADER_LEN) {
             rucksack_texture_close(texture);
             return RuckSackErrorFileAccess;
         }
@@ -1359,7 +1387,7 @@ int rucksack_file_open_texture(struct RuckSackFileEntry *entry,
         image->height = read_uint32be(&buf[24]);
         image->r90 = buf[28];
 
-        image->key_size = read_uint32be(&buf[32]);
+        image->key_size = read_uint32be(&buf[29]);
         image->key = malloc(image->key_size + 1);
         if (!image->key) {
             rucksack_texture_close(texture);
@@ -1425,4 +1453,8 @@ void rucksack_texture_get_images(struct RuckSackTexture *texture,
 
 long rucksack_file_mtime(struct RuckSackFileEntry *entry) {
     return entry->mtime;
+}
+
+int rucksack_bundle_version(void) {
+    return BUNDLE_VERSION;
 }

@@ -794,7 +794,7 @@ static int command_bundle(char *arg0, int argc, char *argv[]) {
 
     int rs_err = rucksack_bundle_open(bundle_filename, &bundle);
     if (rs_err) {
-        fprintf(stderr, "unable to open bundle %s\n", rucksack_err_str(rs_err));
+        fprintf(stderr, "unable to open bundle: %s\n", rucksack_err_str(rs_err));
         return 1;
     }
 

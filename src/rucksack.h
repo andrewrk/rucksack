@@ -13,19 +13,23 @@ extern "C"
 {
 #endif /* __cplusplus */
 
+/* when modifying this structure, remember to add the corresponding entry
+ * in ERROR_STR in rucksack.c */
 enum RuckSackError {
     RuckSackErrorNone,
     RuckSackErrorNoMem,
     RuckSackErrorFileAccess,
     RuckSackErrorInvalidFormat,
+    RuckSackErrorWrongVersion,
+    RuckSackErrorEmptyFile,
     RuckSackErrorInvalidAnchor,
     RuckSackErrorCannotFit,
     RuckSackErrorNoPixels,
     RuckSackErrorImageFormat,
     RuckSackErrorNotFound,
-    RuckSackErrorEmptyFile,
 };
 
+/* the size of this struct is not part of the ABI. */
 struct RuckSackBundle {
     /* the directory to do all path searches relative to */
     const char *cwd;
@@ -92,6 +96,7 @@ void rucksack_init(void);
 void rucksack_finish(void);
 
 void rucksack_version(int *major, int *minor, int *patch);
+int rucksack_bundle_version(void);
 
 const char *rucksack_err_str(int err);
 

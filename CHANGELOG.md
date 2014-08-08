@@ -14,6 +14,10 @@
    - texture header includes the properties that were used to generate it
    - image header uses only 1 byte for the r90 boolean
  * fix not updating bundle when texture properties changed from manifest json
+ * (API breaking) add rucksack_image_create and rucksack_image_destroy.
+   RuckSackImage struct size no longer part of ABI.
+   - now you can set image->key and ignore image->key_size if you have a null-
+     terminated string.
 
 ### 1.0.1
 

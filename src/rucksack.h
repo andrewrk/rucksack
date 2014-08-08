@@ -29,7 +29,7 @@ enum RuckSackError {
     RuckSackErrorNotFound,
 };
 
-/* the size of this struct is not part of the ABI. */
+/* the size of this struct is not part of the public ABI. */
 struct RuckSackBundle {
     /* the directory to do all path searches relative to */
     const char *cwd;
@@ -52,19 +52,25 @@ enum RuckSackAnchor {
     RuckSackAnchorBottomRight,
 };
 
+/* the size of this struct is not part of the public ABI.
+ * Create with rucksack_image_create */
 struct RuckSackImage {
     /* when writing, set this value. when reading it is set automatically. */
     char *key;
-    /* key is an array of bytes, not a null-delimited string.*/
+    /* key is an array of bytes, not a null-delimited string. however,
+     * key_size defaults to -1 which tells rucksack to run strlen on key. */
     int key_size;
     /* when writing, set this value. when reading, it is NULL. */
     char *path;
+    /* defaults to RuckSackAnchorCenter */
     enum RuckSackAnchor anchor;
+    /* set these if you set anchor to RuckSackAnchorExplicit */
     int anchor_x;
     int anchor_y;
 
-    /* assigned after a call to rucksack_bundle_add_texture and also populated
-     * when reading a texture from a bundle */
+    /* the following fields are assigned after a call to
+     * rucksack_bundle_add_texture and also populated when reading a texture
+     * from a bundle */
     int width;
     int height;
 
@@ -77,7 +83,7 @@ struct RuckSackImage {
 
 /* A RuckSackTexture contains multiple images. Also known as a spritesheet.
  * The size of this struct is not part of the public ABI.
- * Use rucksack_texture_create to make one.*/
+ * Use rucksack_texture_create to make one. */
 struct RuckSackTexture {
     /* defaults to 1024x1024 */
     int max_width;
@@ -105,21 +111,27 @@ int rucksack_bundle_close(struct RuckSackBundle *bundle);
 
 /* write API */
 struct RuckSackTexture *rucksack_texture_create(void);
-
-int rucksack_texture_add_image(struct RuckSackTexture *texture, struct RuckSackImage *image);
 void rucksack_texture_destroy(struct RuckSackTexture *texture);
+
+struct RuckSackImage *rucksack_image_create(void);
+void rucksack_image_destroy(struct RuckSackImage *image);
+
+/* rucksack copies data from the image you pass here; you still own the memory. */
+int rucksack_texture_add_image(struct RuckSackTexture *texture, struct RuckSackImage *image);
 
 int rucksack_bundle_add_texture(struct RuckSackBundle *bundle, const char *key,
         struct RuckSackTexture *texture);
 int rucksack_bundle_add_file(struct RuckSackBundle *bundle, const char *key,
         const char *file_name);
-
 int rucksack_bundle_add_stream(struct RuckSackBundle *bundle, const char *key,
         long size_guess, struct RuckSackOutStream **stream);
 
 int rucksack_stream_write(struct RuckSackOutStream *stream, const void *ptr,
         long count);
 void rucksack_stream_close(struct RuckSackOutStream *stream);
+
+
+
 
 /* read API */
 long rucksack_bundle_file_count(struct RuckSackBundle *bundle);

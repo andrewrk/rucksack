@@ -556,13 +556,14 @@ int rucksack_bundle_close(struct RuckSackBundle *bundle) {
 
 struct RuckSackTexture *rucksack_texture_create(void) {
     struct RuckSackTexturePrivate *p = calloc(1, sizeof(struct RuckSackTexturePrivate));
-    if (!p) return NULL;
+    if (!p)
+        return NULL;
     struct RuckSackTexture *texture = &p->externals;
     texture->max_width = 1024;
     texture->max_height = 1024;
     texture->pow2 = 1;
     texture->allow_r90 = 1;
-    return &p->externals;
+    return texture;
 }
 
 void rucksack_texture_destroy(struct RuckSackTexture *texture) {
@@ -665,8 +666,8 @@ int rucksack_texture_add_image(struct RuckSackTexture *texture, struct RuckSackI
         default:
             return RuckSackErrorInvalidAnchor;
     }
-    image->key_size = userimg->key_size;
-    image->key = dupe_byte_str(userimg->key, userimg->key_size);
+    image->key_size = (userimg->key_size == -1) ? strlen(userimg->key) : userimg->key_size;
+    image->key = dupe_byte_str(userimg->key, image->key_size);
     if (!image->key)
         return RuckSackErrorNoMem;
 
@@ -1446,4 +1447,21 @@ long rucksack_file_mtime(struct RuckSackFileEntry *entry) {
 
 int rucksack_bundle_version(void) {
     return BUNDLE_VERSION;
+}
+
+struct RuckSackImage *rucksack_image_create(void) {
+    struct RuckSackImagePrivate *img = calloc(1, sizeof(struct RuckSackImagePrivate));
+    if (!img)
+        return NULL;
+    struct RuckSackImage *image = &img->externals;
+    image->key_size = -1; // run strlen on key to find out key_size
+    image->anchor = RuckSackAnchorCenter;
+    return image;
+}
+
+void rucksack_image_destroy(struct RuckSackImage *image) {
+    if (!image)
+        return;
+    struct RuckSackImagePrivate *img = (struct RuckSackImagePrivate *) image;
+    free(img);
 }

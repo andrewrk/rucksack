@@ -115,7 +115,7 @@ static char *texture_key = NULL;
 static char *file_key = NULL;
 static char *file_path = NULL;
 
-struct RuckSackImage image;
+struct RuckSackImage *image = NULL;
 
 static char *path_prefix = ".";
 
@@ -289,17 +289,16 @@ static int glob_insert_files(void) {
 }
 
 static int add_glob_match_to_texture(char *key, char *path) {
-    image.path = path;
-    image.key = key;
-    image.key_size = strlen(key);
-    int err = rucksack_texture_add_image(texture, &image);
+    image->path = path;
+    image->key = key;
+    int err = rucksack_texture_add_image(texture, image);
     if (err) {
         snprintf(strbuf, sizeof(strbuf), "unable to add image to texture: %s", rucksack_err_str(err));
         return parse_error(strbuf);
     }
     check_latest_mtime(path);
-    image.path = NULL;
-    image.key = NULL;
+    image->path = NULL;
+    image->key = NULL;
     return 0;
 }
 
@@ -343,10 +342,9 @@ static int on_string(struct LaxJsonContext *json, enum LaxJsonType type,
         case StateExpectGlobImagesArray:
             return parse_error("expected globImages array, not string");
         case StateImageName:
-            image.anchor = RuckSackAnchorCenter;
-            image.path = NULL;
-            image.key = strdup(value);
-            image.key_size = strlen(value);
+            image->anchor = RuckSackAnchorCenter;
+            image->path = NULL;
+            image->key = strdup(value);
             state = StateImageObjectBegin;
             break;
         case StateFileName:
@@ -376,23 +374,23 @@ static int on_string(struct LaxJsonContext *json, enum LaxJsonType type,
             break;
         case StateImagePropAnchor:
             if (strcmp(value, "top") == 0) {
-                image.anchor = RuckSackAnchorTop;
+                image->anchor = RuckSackAnchorTop;
             } else if (strcmp(value, "right") == 0) {
-                image.anchor = RuckSackAnchorRight;
+                image->anchor = RuckSackAnchorRight;
             } else if (strcmp(value, "bottom") == 0) {
-                image.anchor = RuckSackAnchorBottom;
+                image->anchor = RuckSackAnchorBottom;
             } else if (strcmp(value, "left") == 0) {
-                image.anchor = RuckSackAnchorLeft;
+                image->anchor = RuckSackAnchorLeft;
             } else if (strcmp(value, "topleft") == 0) {
-                image.anchor = RuckSackAnchorTopLeft;
+                image->anchor = RuckSackAnchorTopLeft;
             } else if (strcmp(value, "topright") == 0) {
-                image.anchor = RuckSackAnchorTopRight;
+                image->anchor = RuckSackAnchorTopRight;
             } else if (strcmp(value, "bottomleft") == 0) {
-                image.anchor = RuckSackAnchorBottomLeft;
+                image->anchor = RuckSackAnchorBottomLeft;
             } else if (strcmp(value, "bottomright") == 0) {
-                image.anchor = RuckSackAnchorBottomRight;
+                image->anchor = RuckSackAnchorBottomRight;
             } else if (strcmp(value, "center") == 0) {
-                image.anchor = RuckSackAnchorCenter;
+                image->anchor = RuckSackAnchorCenter;
             } else {
                 snprintf(strbuf, sizeof(strbuf), "unknown anchor value: %s", value);
                 return parse_error(strbuf);
@@ -419,8 +417,8 @@ static int on_string(struct LaxJsonContext *json, enum LaxJsonType type,
             state = StateFilePropName;
             break;
         case StateImagePropPath:
-            image.path = resolve_path(value);
-            if (!image.path)
+            image->path = resolve_path(value);
+            if (!image->path)
                 return parse_error("out of memory");
             state = StateImagePropName;
             break;
@@ -519,11 +517,11 @@ static int on_number(struct LaxJsonContext *json, double x) {
         case StateImagePropAnchor:
             return parse_error("expected object or string, not number");
         case StateImagePropAnchorX:
-            image.anchor_x = x;
+            image->anchor_x = x;
             state = StateImagePropAnchorObject;
             break;
         case StateImagePropAnchorY:
-            image.anchor_x = x;
+            image->anchor_x = x;
             state = StateImagePropAnchorObject;
             break;
         case StateImagePropPath:
@@ -622,7 +620,7 @@ static int on_begin(struct LaxJsonContext *json, enum LaxJsonType type) {
                 break;
             case StateImagePropAnchor:
                 state = StateImagePropAnchorObject;
-                image.anchor = RuckSackAnchorExplicit;
+                image->anchor = RuckSackAnchorExplicit;
                 break;
             case StateExpectFilesObject:
                 state = StateFileName;
@@ -639,7 +637,7 @@ static int on_begin(struct LaxJsonContext *json, enum LaxJsonType type) {
                 glob_path = NULL;
                 glob_prefix = NULL;
                 // image is used to store anchor information
-                image.anchor = RuckSackAnchorCenter;
+                image->anchor = RuckSackAnchorCenter;
                 break;
             default:
                 return parse_error("unexpected object");
@@ -663,17 +661,17 @@ static int on_end(struct LaxJsonContext *json, enum LaxJsonType type) {
         case StateDone:
             return parse_error("unexpected content after EOF");
         case StateImagePropName:
-            err = rucksack_texture_add_image(texture, &image);
+            err = rucksack_texture_add_image(texture, image);
             if (err) {
                 snprintf(strbuf, sizeof(strbuf), "unable to add image to texture: %s", rucksack_err_str(err));
                 return parse_error(strbuf);
             }
-            check_latest_mtime(image.path);
+            check_latest_mtime(image->path);
 
-            free(image.path);
-            image.path = NULL;
-            free(image.key);
-            image.key = NULL;
+            free(image->path);
+            image->path = NULL;
+            free(image->key);
+            image->key = NULL;
 
             state = StateImageName;
             break;
@@ -1074,7 +1072,15 @@ static int command_help(char *arg0, int argc, char *argv[]) {
     return 1;
 }
 
+static void cleanup(void) {
+    rucksack_image_destroy(image);
+}
+
 int main(int argc, char *argv[]) {
+    image = rucksack_image_create();
+    image->key_size = -1;
+    atexit(cleanup);
+
     if (argc < 2) return usage(argv[0]);
 
     char *cmd_name = argv[1];

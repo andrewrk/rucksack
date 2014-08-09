@@ -1038,7 +1038,6 @@ int rucksack_bundle_add_texture(struct RuckSackBundle *bundle, struct RuckSackTe
     FreeImage_SaveToMemory(FIF_PNG, out_bmp, out_stream, 0);
     FreeImage_Unload(out_bmp);
 
-    // write that to a debug file
     BYTE *data;
     DWORD data_size;
     FreeImage_AcquireMemory(out_stream, &data, &data_size);
@@ -1049,7 +1048,7 @@ int rucksack_bundle_add_texture(struct RuckSackBundle *bundle, struct RuckSackTe
     for (int i = 0; i < p->images_count; i += 1) {
         struct RuckSackImagePrivate *img = &p->images[i];
         struct RuckSackImage *image = &img->externals;
-        total_image_entries_size += HEADER_ENTRY_LEN + image->key_size;
+        total_image_entries_size += IMAGE_HEADER_LEN + image->key_size;
     }
     long image_data_offset = TEXTURE_HEADER_LEN + total_image_entries_size;
     long total_size = image_data_offset + data_size;
@@ -1096,6 +1095,10 @@ int rucksack_bundle_add_texture(struct RuckSackBundle *bundle, struct RuckSackTe
         if (err)
             return err;
     }
+
+    // make sure that the position that we told we were about to write the
+    // image data to is correct.
+    assert(image_data_offset == stream->e->size);
 
     err = rucksack_stream_write(stream, data, data_size);
     if (err)

@@ -12,6 +12,7 @@
 #include <assert.h>
 #include <string.h>
 #include <stdlib.h>
+#include <FreeImage.h>
 
 static void ok(int err) {
     if (!err) return;
@@ -139,6 +140,20 @@ static void test_texture_packing(void) {
     assert(got_them[1]);
     assert(got_them[2]);
     assert(got_them[3]);
+
+    long texture_size = rucksack_texture_size(texture);
+    unsigned char *buffer = malloc(texture_size);
+    assert(buffer);
+    ok(rucksack_texture_read(texture, buffer));
+
+    FIMEMORY *fi_mem = FreeImage_OpenMemory(buffer, texture_size);
+    assert(fi_mem);
+    FREE_IMAGE_FORMAT fif = FreeImage_GetFileTypeFromMemory(fi_mem, 0);
+    assert(fif == FIF_PNG);
+    FIBITMAP *bmp = FreeImage_LoadFromMemory(fif, fi_mem, 0);
+    assert(FreeImage_HasPixels(bmp));
+    assert(FreeImage_GetWidth(bmp) == 16);
+    assert(FreeImage_GetHeight(bmp) == 64);
 
     rucksack_texture_destroy(texture);
 

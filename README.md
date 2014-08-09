@@ -186,15 +186,16 @@ below.
     Offset | Contents
     -------+---------
          0 | uint32be size of this image entry header in bytes
-         4 | uint32be anchor x
-         8 | uint32be anchor y
-        12 | uint32be image x
-        16 | uint32be image y
-        20 | uint32be unrotated image width
-        24 | uint32be unrotated image height
-        28 | uint8 boolean whether the image is rotated clockwise 90 degrees
-        29 | uint32be key size in bytes
-        33 | key bytes
+         4 | uint32be anchor position enum value
+         8 | uint32be anchor x
+        12 | uint32be anchor y
+        16 | uint32be image x
+        20 | uint32be image y
+        24 | uint32be unrotated image width
+        28 | uint32be unrotated image height
+        32 | uint8 boolean whether the image is rotated clockwise 90 degrees
+        33 | uint32be key size in bytes
+        37 | key bytes
 
 ## Projects Using rucksack
 

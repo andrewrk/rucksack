@@ -30,7 +30,7 @@ static const int BUNDLE_VERSION = 1;
 static const int MAIN_HEADER_LEN = 28;
 static const int HEADER_ENTRY_LEN = 36; // not taking into account key bytes
 static const int TEXTURE_HEADER_LEN = 38;
-static const int IMAGE_HEADER_LEN = 33; // not taking into account key bytes
+static const int IMAGE_HEADER_LEN = 37; // not taking into account key bytes
 
 static const char *ERROR_STR[] = {
     "",
@@ -622,7 +622,7 @@ int rucksack_texture_add_image(struct RuckSackTexture *texture, struct RuckSackI
     image->width = FreeImage_GetWidth(bmp);
     image->height = FreeImage_GetHeight(bmp);
 
-    image->anchor = RuckSackAnchorExplicit;
+    image->anchor = userimg->anchor;
     switch (userimg->anchor) {
         case RuckSackAnchorExplicit:
             // nothing to do
@@ -1044,7 +1044,7 @@ int rucksack_bundle_add_texture(struct RuckSackBundle *bundle, const char *key,
         struct RuckSackImage *image = &img->externals;
         total_image_entries_size += HEADER_ENTRY_LEN + image->key_size;
     }
-    long image_data_offset = 12 + total_image_entries_size;
+    long image_data_offset = TEXTURE_HEADER_LEN + total_image_entries_size;
     long total_size = image_data_offset + data_size;
 
     struct RuckSackOutStream *stream;
@@ -1071,14 +1071,15 @@ int rucksack_bundle_add_texture(struct RuckSackBundle *bundle, const char *key,
         struct RuckSackImage *image = &img->externals;
 
         write_uint32be(&buf[0], IMAGE_HEADER_LEN + image->key_size);
-        write_uint32be(&buf[4], image->anchor_x);
-        write_uint32be(&buf[8], image->anchor_y);
-        write_uint32be(&buf[12], image->x);
-        write_uint32be(&buf[16], image->y);
-        write_uint32be(&buf[20], image->width);
-        write_uint32be(&buf[24], image->height);
-        buf[28] = image->r90;
-        write_uint32be(&buf[29], image->key_size);
+        write_uint32be(&buf[4], image->anchor);
+        write_uint32be(&buf[8], image->anchor_x);
+        write_uint32be(&buf[12], image->anchor_y);
+        write_uint32be(&buf[16], image->x);
+        write_uint32be(&buf[20], image->y);
+        write_uint32be(&buf[24], image->width);
+        write_uint32be(&buf[28], image->height);
+        buf[32] = image->r90;
+        write_uint32be(&buf[33], image->key_size);
 
         err = rucksack_stream_write(stream, buf, IMAGE_HEADER_LEN);
         if (err)
@@ -1366,7 +1367,6 @@ int rucksack_file_open_texture(struct RuckSackFileEntry *entry,
     for (int i = 0; i < t->images_count; i += 1) {
         struct RuckSackImagePrivate *img = &t->images[i];
         struct RuckSackImage *image = &img->externals;
-        image->anchor = RuckSackAnchorExplicit;
 
         if (fseek(b->f, next_offset, SEEK_SET)) {
             rucksack_texture_destroy(texture);
@@ -1382,15 +1382,16 @@ int rucksack_file_open_texture(struct RuckSackFileEntry *entry,
         long this_size = read_uint32be(&buf[0]);
         next_offset += this_size;
 
-        image->anchor_x = read_uint32be(&buf[4]);
-        image->anchor_y = read_uint32be(&buf[8]);
-        image->x = read_uint32be(&buf[12]);
-        image->y = read_uint32be(&buf[16]);
-        image->width = read_uint32be(&buf[20]);
-        image->height = read_uint32be(&buf[24]);
-        image->r90 = buf[28];
+        image->anchor = read_uint32be(&buf[4]);
+        image->anchor_x = read_uint32be(&buf[8]);
+        image->anchor_y = read_uint32be(&buf[12]);
+        image->x = read_uint32be(&buf[16]);
+        image->y = read_uint32be(&buf[20]);
+        image->width = read_uint32be(&buf[24]);
+        image->height = read_uint32be(&buf[28]);
+        image->r90 = buf[32];
 
-        image->key_size = read_uint32be(&buf[29]);
+        image->key_size = read_uint32be(&buf[33]);
         image->key = malloc(image->key_size + 1);
         if (!image->key) {
             rucksack_texture_destroy(texture);

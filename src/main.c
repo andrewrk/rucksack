@@ -109,8 +109,17 @@ static char strbuf2[2048];
 static char strbuf3[2048];
 static char strbuf4[2048];
 
+// texture we will add to the bundle
 static struct RuckSackTexture *texture = NULL;
 static char *texture_key = NULL;
+
+// the texture that is already in the bundle
+static struct RuckSackTexture *bundle_texture = NULL;
+static struct RuckSackFileEntry *bundle_texture_entry = NULL;
+static int dirty_texture_flag = 0;
+static long bundle_mtime = 0;
+static long bundle_texture_image_count = 0;
+static struct RuckSackImage **bundle_texture_images = NULL;
 
 static char *file_key = NULL;
 static char *file_path = NULL;
@@ -128,8 +137,6 @@ static enum State anchor_next_state;
 
 static char debug_mode = 0;
 static char verbose = 0;
-
-static long latest_mtime = 0;
 
 static const char *ERR_STR[] = {
     "",
@@ -172,28 +179,62 @@ static char *resolve_path(const char *path) {
     return out;
 }
 
-static void check_latest_mtime(const char *path) {
+static char *memstrclone(const char *mem, int length) {
+    char *clone = malloc(length + 1);
+    if (clone) {
+        memcpy(clone, mem, length);
+        clone[length] = 0;
+    }
+    return clone;
+}
+
+static int memneql(const char *mem1, int mem1_size, const char *mem2, int mem2_size) {
+    if (mem1_size != mem2_size)
+        return 1;
+    else
+        return memcmp(mem1, mem2, mem1_size);
+}
+
+static void check_if_image_dirty(void) {
+    // if already marked as dirty, we have no work to do.
+    if (dirty_texture_flag)
+        return;
+
     struct stat st;
-    stat(path, &st);
+    stat(image->path, &st);
     long mtime = st.st_mtime;
-    if (mtime > latest_mtime)
-        latest_mtime = mtime;
+    if (mtime > bundle_mtime) {
+        dirty_texture_flag = 1;
+        return;
+    }
+
+    for (int i = 0; i < bundle_texture_image_count; i += 1) {
+        struct RuckSackImage *bundle_image = bundle_texture_images[i];
+        if (memneql(bundle_image->key, bundle_image->key_size, image->key, image->key_size) == 0) {
+            dirty_texture_flag = bundle_image->anchor != image->anchor ||
+                (image->anchor == RuckSackAnchorExplicit &&
+                (bundle_image->anchor_x != image->anchor_x ||
+                bundle_image->anchor_y != image->anchor_y));
+            return;
+        }
+    }
+
+    // did not find the image in the texture.
+    dirty_texture_flag = 1;
 }
 
 static int add_texture_if_outdated(struct RuckSackBundle *bundle, char *key,
         struct RuckSackTexture *texture)
 {
-    struct RuckSackFileEntry *entry = rucksack_bundle_find_file(bundle, key);
-    if (entry) {
-        struct RuckSackTexture *bundle_texture;
-        rucksack_file_open_texture(entry, &bundle_texture);
-        long bundle_mtime = rucksack_file_mtime(entry);
-        int up_to_date = latest_mtime <= bundle_mtime &&
+    if (bundle_texture_entry) {
+        int up_to_date = !dirty_texture_flag &&
             bundle_texture->max_width == texture->max_width &&
             bundle_texture->max_height == texture->max_height &&
-            bundle_texture->allow_r90 == texture->allow_r90 &&
+            bundle_texture->pow2 == texture->pow2 &&
             bundle_texture->allow_r90 == texture->allow_r90;
         rucksack_texture_destroy(bundle_texture);
+        free(bundle_texture_images);
+        bundle_texture_images = NULL;
         if (up_to_date) {
             if (verbose)
                 fprintf(stderr, "Texture up to date: %s\n", key);
@@ -291,12 +332,13 @@ static int glob_insert_files(void) {
 static int add_glob_match_to_texture(char *key, char *path) {
     image->path = path;
     image->key = key;
+    image->key_size = strlen(key);
     int err = rucksack_texture_add_image(texture, image);
     if (err) {
         snprintf(strbuf, sizeof(strbuf), "unable to add image to texture: %s", rucksack_err_str(err));
         return parse_error(strbuf);
     }
-    check_latest_mtime(path);
+    check_if_image_dirty();
     image->path = NULL;
     image->key = NULL;
     return 0;
@@ -335,6 +377,22 @@ static int on_string(struct LaxJsonContext *json, enum LaxJsonType type,
             if (!texture)
                 return parse_error("out of memory");
             texture_key = strdup(value);
+            bundle_texture_entry = rucksack_bundle_find_file(bundle, texture_key);
+            dirty_texture_flag = 0;
+            if (bundle_texture_entry) {
+                rucksack_file_open_texture(bundle_texture_entry, &bundle_texture);
+                if (bundle_texture) {
+                    bundle_mtime = rucksack_file_mtime(bundle_texture_entry);
+                    bundle_texture_image_count = rucksack_texture_image_count(bundle_texture);
+                    bundle_texture_images = malloc(sizeof(struct RuckSackImage *) *
+                            bundle_texture_image_count);
+                    if (!bundle_texture_images)
+                        return parse_error("out of memory");
+                    rucksack_texture_get_images(bundle_texture, bundle_texture_images);
+                } else {
+                    dirty_texture_flag = 1;
+                }
+            }
             state = StateExpectTextureObject;
             break;
         case StateExpectImagesObject:
@@ -344,7 +402,10 @@ static int on_string(struct LaxJsonContext *json, enum LaxJsonType type,
         case StateImageName:
             image->anchor = RuckSackAnchorCenter;
             image->path = NULL;
-            image->key = strdup(value);
+            image->key = memstrclone(value, length);
+            if (!image->key)
+                return parse_error("out of memory");
+            image->key_size = length;
             state = StateImageObjectBegin;
             break;
         case StateFileName:
@@ -666,7 +727,7 @@ static int on_end(struct LaxJsonContext *json, enum LaxJsonType type) {
                 snprintf(strbuf, sizeof(strbuf), "unable to add image to texture: %s", rucksack_err_str(err));
                 return parse_error(strbuf);
             }
-            check_latest_mtime(image->path);
+            check_if_image_dirty();
 
             free(image->path);
             image->path = NULL;
@@ -792,7 +853,7 @@ static int command_bundle(char *arg0, int argc, char *argv[]) {
     } else {
         in_f = fopen(input_filename, "rb");
         if (!in_f) {
-            fprintf(stderr, "Unable to open input file\n");
+            fprintf(stderr, "Unable to open %s\n", input_filename);
             return 1;
         }
     }
@@ -1078,7 +1139,6 @@ static void cleanup(void) {
 
 int main(int argc, char *argv[]) {
     image = rucksack_image_create();
-    image->key_size = -1;
     atexit(cleanup);
 
     if (argc < 2) return usage(argv[0]);

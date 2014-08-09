@@ -111,7 +111,6 @@ static char strbuf4[2048];
 
 // texture we will add to the bundle
 static struct RuckSackTexture *texture = NULL;
-static char *texture_key = NULL;
 
 // the texture that is already in the bundle
 static struct RuckSackTexture *bundle_texture = NULL;
@@ -122,6 +121,7 @@ static long bundle_texture_image_count = 0;
 static struct RuckSackImage **bundle_texture_images = NULL;
 
 static char *file_key = NULL;
+static int file_key_size = 0;
 static char *file_path = NULL;
 
 struct RuckSackImage *image = NULL;
@@ -223,7 +223,7 @@ static void check_if_image_dirty(void) {
     dirty_texture_flag = 1;
 }
 
-static int add_texture_if_outdated(struct RuckSackBundle *bundle, char *key,
+static int add_texture_if_outdated(struct RuckSackBundle *bundle, 
         struct RuckSackTexture *texture)
 {
     if (bundle_texture_entry) {
@@ -237,15 +237,15 @@ static int add_texture_if_outdated(struct RuckSackBundle *bundle, char *key,
         bundle_texture_images = NULL;
         if (up_to_date) {
             if (verbose)
-                fprintf(stderr, "Texture up to date: %s\n", key);
+                fprintf(stderr, "Texture up to date: %s\n", texture->key);
             return 0;
         }
         if (verbose)
-            fprintf(stderr, "Updating texture: %s\n", key);
+            fprintf(stderr, "Updating texture: %s\n", texture->key);
     } else if (verbose) {
-        fprintf(stderr, "New texture: %s\n", key);
+        fprintf(stderr, "New texture: %s\n", texture->key);
     }
-    int err = rucksack_bundle_add_texture(bundle, key, texture);
+    int err = rucksack_bundle_add_texture(bundle, texture);
     if (err) {
         snprintf(strbuf, sizeof(strbuf), "unable to add texture: %s", rucksack_err_str(err));
         return parse_error(strbuf);
@@ -253,8 +253,10 @@ static int add_texture_if_outdated(struct RuckSackBundle *bundle, char *key,
     return 0;
 }
 
-static int add_file_if_outdated(struct RuckSackBundle *bundle, char *key, char *path) {
-    struct RuckSackFileEntry *entry = rucksack_bundle_find_file(bundle, key);
+static int add_file_if_outdated(struct RuckSackBundle *bundle,
+        char *key, int key_size, char *path)
+{
+    struct RuckSackFileEntry *entry = rucksack_bundle_find_file(bundle, key, key_size);
     if (entry) {
         long bundle_mtime = rucksack_file_mtime(entry);
         struct stat st;
@@ -270,7 +272,7 @@ static int add_file_if_outdated(struct RuckSackBundle *bundle, char *key, char *
     } else if (verbose) {
         fprintf(stderr, "New file: %s\n", key);
     }
-    int err = rucksack_bundle_add_file(bundle, key, path);
+    int err = rucksack_bundle_add_file(bundle, key, key_size, path);
     if (err) {
         snprintf(strbuf, sizeof(strbuf), "unable to add %s: %s", path, rucksack_err_str(err));
         return parse_error(strbuf);
@@ -278,7 +280,7 @@ static int add_file_if_outdated(struct RuckSackBundle *bundle, char *key, char *
     return 0;
 }
 
-static int perform_glob(int (*match_callback)(char *key, char *path)) {
+static int perform_glob(int (*match_callback)(char *key, int key_size, char *path)) {
     char *use_glob_str = glob_glob ? glob_glob : "*";
     char *use_glob_path = glob_path ? glob_path : "";
     char *use_glob_prefix = glob_prefix ? glob_prefix : "";
@@ -312,7 +314,7 @@ static int perform_glob(int (*match_callback)(char *key, char *path)) {
         path_relative(strbuf3, path, strbuf2);
 
         snprintf(strbuf4, sizeof(strbuf4), "%s%s", use_glob_prefix, strbuf2);
-        err = match_callback(strbuf4, path);
+        err = match_callback(strbuf4, strlen(strbuf4), path);
         if (err) return err;
     }
 
@@ -321,18 +323,18 @@ static int perform_glob(int (*match_callback)(char *key, char *path)) {
     return 0;
 }
 
-static int add_glob_match_to_bundle(char *key, char *path) {
-    return add_file_if_outdated(bundle, key, path);
+static int add_glob_match_to_bundle(char *key, int key_size, char *path) {
+    return add_file_if_outdated(bundle, key, key_size, path);
 }
 
 static int glob_insert_files(void) {
     return perform_glob(add_glob_match_to_bundle);
 }
 
-static int add_glob_match_to_texture(char *key, char *path) {
+static int add_glob_match_to_texture(char *key, int key_size, char *path) {
     image->path = path;
     image->key = key;
-    image->key_size = strlen(key);
+    image->key_size = key_size;
     int err = rucksack_texture_add_image(texture, image);
     if (err) {
         snprintf(strbuf, sizeof(strbuf), "unable to add image to texture: %s", rucksack_err_str(err));
@@ -376,8 +378,9 @@ static int on_string(struct LaxJsonContext *json, enum LaxJsonType type,
             texture = rucksack_texture_create();
             if (!texture)
                 return parse_error("out of memory");
-            texture_key = strdup(value);
-            bundle_texture_entry = rucksack_bundle_find_file(bundle, texture_key);
+            texture->key = memstrclone(value, length);
+            texture->key_size = length;
+            bundle_texture_entry = rucksack_bundle_find_file(bundle, texture->key, texture->key_size);
             dirty_texture_flag = 0;
             if (bundle_texture_entry) {
                 rucksack_file_open_texture(bundle_texture_entry, &bundle_texture);
@@ -409,7 +412,8 @@ static int on_string(struct LaxJsonContext *json, enum LaxJsonType type,
             state = StateImageObjectBegin;
             break;
         case StateFileName:
-            file_key = strdup(value);
+            file_key = memstrclone(value, length);
+            file_key_size = length;
             state = StateFileObjectBegin;
             break;
         case StateImageObjectBegin:
@@ -737,7 +741,7 @@ static int on_end(struct LaxJsonContext *json, enum LaxJsonType type) {
             state = StateImageName;
             break;
         case StateFilePropName:
-            err = add_file_if_outdated(bundle, file_key, file_path);
+            err = add_file_if_outdated(bundle, file_key, file_key_size, file_path);
             if (err) return err;
 
             free(file_path);
@@ -754,14 +758,12 @@ static int on_end(struct LaxJsonContext *json, enum LaxJsonType type) {
             state = StateTextureProp;
             break;
         case StateTextureProp:
-            err = add_texture_if_outdated(bundle, texture_key, texture);
+            err = add_texture_if_outdated(bundle, texture);
             if (err) return err;
 
+            free(texture->key);
             rucksack_texture_destroy(texture);
             texture = NULL;
-
-            free(texture_key);
-            texture_key = NULL;
 
             state = StateTextureName;
             break;
@@ -941,7 +943,7 @@ static int command_cat(char *arg0, int argc, char *argv[]) {
         return 1;
     }
 
-    struct RuckSackFileEntry *entry = rucksack_bundle_find_file(bundle, resource_name);
+    struct RuckSackFileEntry *entry = rucksack_bundle_find_file(bundle, resource_name, -1);
     if (!entry) {
         fprintf(stderr, "entry not found\n");
         return 1;

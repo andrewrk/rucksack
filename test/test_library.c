@@ -33,9 +33,9 @@ static void test_write_read(void) {
     struct RuckSackBundle *bundle;
     ok(rucksack_bundle_open(bundle_name, &bundle));
 
-    ok(rucksack_bundle_add_file(bundle, "blah", "../test/blah.txt"));
+    ok(rucksack_bundle_add_file(bundle, "blah", -1, "../test/blah.txt"));
 
-    struct RuckSackFileEntry *entry = rucksack_bundle_find_file(bundle, "blah");
+    struct RuckSackFileEntry *entry = rucksack_bundle_find_file(bundle, "blah", -1);
     assert(entry);
 
     size_t size = rucksack_file_size(entry);
@@ -50,7 +50,7 @@ static void test_write_read(void) {
 
     ok(rucksack_bundle_open(bundle_name, &bundle));
 
-    entry = rucksack_bundle_find_file(bundle, "blah");
+    entry = rucksack_bundle_find_file(bundle, "blah", -1);
     assert(entry);
 
     size = rucksack_file_size(entry);
@@ -93,7 +93,8 @@ static void test_texture_packing(void) {
     ok(rucksack_texture_add_image(texture, img));
     rucksack_image_destroy(img);
 
-    ok(rucksack_bundle_add_texture(bundle, "texture_foo", texture));
+    texture->key = "texture_foo";
+    ok(rucksack_bundle_add_texture(bundle, texture));
 
     rucksack_texture_destroy(texture);
 
@@ -102,7 +103,7 @@ static void test_texture_packing(void) {
     // now try to read it
     ok(rucksack_bundle_open(bundle_name, &bundle));
 
-    struct RuckSackFileEntry *entry = rucksack_bundle_find_file(bundle, "texture_foo");
+    struct RuckSackFileEntry *entry = rucksack_bundle_find_file(bundle, "texture_foo", -1);
     assert(entry);
 
     ok(rucksack_file_open_texture(entry, &texture));
@@ -167,7 +168,8 @@ static void test_bundling_twice(void) {
         ok(rucksack_texture_add_image(texture, img));
         rucksack_image_destroy(img);
 
-        ok(rucksack_bundle_add_texture(bundle, "cockpit", texture));
+        texture->key = "cockpit";
+        ok(rucksack_bundle_add_texture(bundle, texture));
 
         rucksack_texture_destroy(texture);
 
@@ -177,7 +179,7 @@ static void test_bundling_twice(void) {
     struct RuckSackBundle *bundle;
     ok(rucksack_bundle_open(bundle_name, &bundle));
 
-    struct RuckSackFileEntry *entry = rucksack_bundle_find_file(bundle, "cockpit");
+    struct RuckSackFileEntry *entry = rucksack_bundle_find_file(bundle, "cockpit", -1);
     assert(entry);
 
     size_t size = rucksack_file_size(entry);
@@ -195,9 +197,9 @@ static void test_three_files(void) {
     struct RuckSackBundle *bundle;
     ok(rucksack_bundle_open(bundle_name, &bundle));
 
-    ok(rucksack_bundle_add_file(bundle, "blah", "../test/blah.txt"));
-    ok(rucksack_bundle_add_file(bundle, "g_globby1.txt", "../test/globby/globby1.txt"));
-    ok(rucksack_bundle_add_file(bundle, "g_globby2.txt", "../test/globby/globby2.txt"));
+    ok(rucksack_bundle_add_file(bundle, "blah", -1, "../test/blah.txt"));
+    ok(rucksack_bundle_add_file(bundle, "g_globby1.txt", -1, "../test/globby/globby1.txt"));
+    ok(rucksack_bundle_add_file(bundle, "g_globby2.txt", -1, "../test/globby/globby2.txt"));
 
     ok(rucksack_bundle_close(bundle));
 }
@@ -208,11 +210,11 @@ static void test_16kb_file(void) {
 
     struct RuckSackBundle *bundle;
     ok(rucksack_bundle_open(bundle_name, &bundle));
-    ok(rucksack_bundle_add_file(bundle, "monkey.obj", "../test/monkey.obj"));
+    ok(rucksack_bundle_add_file(bundle, "monkey.obj", -1, "../test/monkey.obj"));
     ok(rucksack_bundle_close(bundle));
 
     ok(rucksack_bundle_open(bundle_name, &bundle));
-    struct RuckSackFileEntry *entry = rucksack_bundle_find_file(bundle, "monkey.obj");
+    struct RuckSackFileEntry *entry = rucksack_bundle_find_file(bundle, "monkey.obj", -1);
     assert(entry);
 
     long size = rucksack_file_size(entry);
@@ -265,7 +267,8 @@ static void test_non_default_texture_props(void) {
     img->path = "../test/file0.png";
     img->key = "image0";
     ok(rucksack_texture_add_image(texture, img));
-    ok(rucksack_bundle_add_texture(bundle, "texture_foo", texture));
+    texture->key = "texture_foo";
+    ok(rucksack_bundle_add_texture(bundle, texture));
     rucksack_image_destroy(img);
     rucksack_texture_destroy(texture);
 
@@ -273,7 +276,7 @@ static void test_non_default_texture_props(void) {
 
     // now make sure the properties persisted
     ok(rucksack_bundle_open(bundle_name, &bundle));
-    struct RuckSackFileEntry *entry = rucksack_bundle_find_file(bundle, "texture_foo");
+    struct RuckSackFileEntry *entry = rucksack_bundle_find_file(bundle, "texture_foo", -1);
     assert(entry);
 
     ok(rucksack_file_open_texture(entry, &texture));

@@ -113,6 +113,13 @@ struct RuckSackOutStream {
     struct RuckSackFileEntry *e;
 };
 
+static int memneql(const char *mem1, int mem1_size, const char *mem2, int mem2_size) {
+    if (mem1_size != mem2_size)
+        return 1;
+    else
+        return memcmp(mem1, mem2, mem1_size);
+}
+
 static long int alloc_size(long int actual_size) {
     return 2 * actual_size + 8192;
 }
@@ -559,6 +566,7 @@ struct RuckSackTexture *rucksack_texture_create(void) {
     if (!p)
         return NULL;
     struct RuckSackTexture *texture = &p->externals;
+    texture->key_size = -1;
     texture->max_width = 1024;
     texture->max_height = 1024;
     texture->pow2 = 1;
@@ -973,8 +981,7 @@ static int next_pow2(int x) {
     return power;
 }
 
-int rucksack_bundle_add_texture(struct RuckSackBundle *bundle, const char *key,
-        struct RuckSackTexture *texture)
+int rucksack_bundle_add_texture(struct RuckSackBundle *bundle, struct RuckSackTexture *texture)
 {
     struct RuckSackTexturePrivate *p = (struct RuckSackTexturePrivate *) texture;
 
@@ -1048,7 +1055,7 @@ int rucksack_bundle_add_texture(struct RuckSackBundle *bundle, const char *key,
     long total_size = image_data_offset + data_size;
 
     struct RuckSackOutStream *stream;
-    err = rucksack_bundle_add_stream(bundle, key, total_size, &stream);
+    err = rucksack_bundle_add_stream(bundle, texture->key, texture->key_size, total_size, &stream);
     if (err)
         return err;
 
@@ -1101,7 +1108,7 @@ int rucksack_bundle_add_texture(struct RuckSackBundle *bundle, const char *key,
 }
 
 int rucksack_bundle_add_file(struct RuckSackBundle *bundle, const char *key,
-        const char *file_name)
+        int key_size, const char *file_name)
 {
     FILE *f = fopen(file_name, "rb");
 
@@ -1119,7 +1126,7 @@ int rucksack_bundle_add_file(struct RuckSackBundle *bundle, const char *key,
     off_t size = st.st_size;
 
     struct RuckSackOutStream *stream;
-    err = rucksack_bundle_add_stream(bundle, key, size, &stream);
+    err = rucksack_bundle_add_stream(bundle, key, key_size, size, &stream);
     if (err) {
         fclose(f);
         return err;
@@ -1184,21 +1191,21 @@ static int allocate_file_entry(struct RuckSackBundlePrivate *b, const char *key,
 }
 
 static struct RuckSackFileEntry *find_file_entry(struct RuckSackBundlePrivate *b,
-        const char *key)
+        const char *key, int key_size)
 {
     for (int i = 0; i < b->header_entry_count; i += 1) {
         struct RuckSackFileEntry *e = &b->entries[i];
-        if (strcmp(key, e->key) == 0)
+        if (memneql(key, key_size, e->key, e->key_size) == 0)
             return e;
     }
     return NULL;
 }
 
 static int get_file_entry(struct RuckSackBundlePrivate *b, const char *key,
-        long int size, struct RuckSackFileEntry **out_entry)
+        int key_size, long int size, struct RuckSackFileEntry **out_entry)
 {
     // return info for existing entry
-    struct RuckSackFileEntry *e = find_file_entry(b, key);
+    struct RuckSackFileEntry *e = find_file_entry(b, key, key_size);
     if (e) {
         if (e->allocated_size < size) {
             int err = resize_file_entry(b, e, size);
@@ -1216,7 +1223,7 @@ static int get_file_entry(struct RuckSackBundlePrivate *b, const char *key,
 }
 
 int rucksack_bundle_add_stream(struct RuckSackBundle *bundle,
-        const char *key, long int size_guess, struct RuckSackOutStream **out_stream)
+        const char *key, int key_size, long int size_guess, struct RuckSackOutStream **out_stream)
 {
     struct RuckSackOutStream *stream = calloc(1, sizeof(struct RuckSackOutStream));
 
@@ -1224,9 +1231,10 @@ int rucksack_bundle_add_stream(struct RuckSackBundle *bundle,
         *out_stream = NULL;
         return RuckSackErrorNoMem;
     }
+    key_size = (key_size == -1) ? strlen(key) : key_size;
 
     stream->b = (struct RuckSackBundlePrivate *) bundle;
-    int err = get_file_entry(stream->b, key, alloc_size(size_guess), &stream->e);
+    int err = get_file_entry(stream->b, key, key_size, alloc_size(size_guess), &stream->e);
     if (err) {
         free(stream);
         *out_stream = NULL;
@@ -1271,9 +1279,12 @@ int rucksack_stream_write(struct RuckSackOutStream *stream, const void *ptr,
     return RuckSackErrorNone;
 }
 
-struct RuckSackFileEntry *rucksack_bundle_find_file(struct RuckSackBundle *bundle, const char *key) {
+struct RuckSackFileEntry *rucksack_bundle_find_file(struct RuckSackBundle *bundle,
+        const char *key, int key_size)
+{
     struct RuckSackBundlePrivate *b = (struct RuckSackBundlePrivate *) bundle;
-    return find_file_entry(b, key);
+    key_size = (key_size == -1) ? strlen(key) : key_size;
+    return find_file_entry(b, key, key_size);
 }
 
 long int rucksack_file_size(struct RuckSackFileEntry *entry) {
@@ -1404,6 +1415,9 @@ int rucksack_file_open_texture(struct RuckSackFileEntry *entry,
         }
         image->key[image->key_size] = 0;
     }
+
+    texture->key = entry->key;
+    texture->key_size = entry->key_size;
 
     *out_texture = texture;
     return RuckSackErrorNone;

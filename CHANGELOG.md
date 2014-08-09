@@ -20,6 +20,10 @@
    RuckSackImage struct size no longer part of ABI.
    - now you can set image->key and ignore image->key_size if you have a null-
      terminated string.
+ * (API breaking) key and key_size are passed in via RuckSackTexture struct
+   instead of separate arguments to rucksack_file_open_texture
+ * (API breaking) all API that deals with keys now has a key_size parameter. All
+   keys are arrays of bytes with a length, and keys may have null bytes in them.
 
 ### 1.0.1
 

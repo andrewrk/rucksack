@@ -85,6 +85,12 @@ struct RuckSackImage {
  * The size of this struct is not part of the public ABI.
  * Use rucksack_texture_create to make one. */
 struct RuckSackTexture {
+    /* when writing, set this value. when reading it is set automatically. */
+    char *key;
+    /* key is an array of bytes, not a null-delimited string. however,
+     * key_size defaults to -1 which tells rucksack to run strlen on key. */
+    int key_size;
+
     /* defaults to 1024x1024 */
     int max_width;
     int max_height;
@@ -119,12 +125,11 @@ void rucksack_image_destroy(struct RuckSackImage *image);
 /* rucksack copies data from the image you pass here; you still own the memory. */
 int rucksack_texture_add_image(struct RuckSackTexture *texture, struct RuckSackImage *image);
 
-int rucksack_bundle_add_texture(struct RuckSackBundle *bundle, const char *key,
-        struct RuckSackTexture *texture);
+int rucksack_bundle_add_texture(struct RuckSackBundle *bundle, struct RuckSackTexture *texture);
 int rucksack_bundle_add_file(struct RuckSackBundle *bundle, const char *key,
-        const char *file_name);
+        int key_size, const char *file_name);
 int rucksack_bundle_add_stream(struct RuckSackBundle *bundle, const char *key,
-        long size_guess, struct RuckSackOutStream **stream);
+        int key_size, long size_guess, struct RuckSackOutStream **stream);
 
 int rucksack_stream_write(struct RuckSackOutStream *stream, const void *ptr,
         long count);
@@ -139,7 +144,7 @@ void rucksack_bundle_get_files(struct RuckSackBundle *bundle,
         struct RuckSackFileEntry **entries);
 
 struct RuckSackFileEntry *rucksack_bundle_find_file(
-        struct RuckSackBundle *bundle, const char *key);
+        struct RuckSackBundle *bundle, const char *key, int key_size);
 long rucksack_file_size(struct RuckSackFileEntry *entry);
 const char *rucksack_file_name(struct RuckSackFileEntry *entry);
 long rucksack_file_mtime(struct RuckSackFileEntry *entry);

@@ -42,6 +42,10 @@ static void test_write_read(void) {
     size_t size = rucksack_file_size(entry);
     assert(size == 10);
 
+    int is_texture;
+    ok(rucksack_file_is_texture(entry, &is_texture));
+    assert(is_texture == 0);
+
     char buf[11];
     ok(rucksack_file_read(entry, (unsigned char *)buf));
     buf[10] = 0;
@@ -106,6 +110,10 @@ static void test_texture_packing(void) {
 
     struct RuckSackFileEntry *entry = rucksack_bundle_find_file(bundle, "texture_foo", -1);
     assert(entry);
+
+    int is_texture;
+    ok(rucksack_file_is_texture(entry, &is_texture));
+    assert(is_texture == 1);
 
     ok(rucksack_file_open_texture(entry, &texture));
 

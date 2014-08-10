@@ -23,6 +23,7 @@
 #define MAX(x, y) ((x) > (y) ? (x) : (y))
 #define MIN(x, y) ((x) < (y) ? (x) : (y))
 
+static const int UUID_SIZE = 16;
 static const char *BUNDLE_UUID = "\x60\x70\xc8\x99\x82\xa1\x41\x84\x89\x51\x08\xc9\x1c\xc9\xb6\x20";
 static const char *TEXTURE_UUID = "\x0e\xb1\x4c\x84\x47\x4c\xb3\xad\xa6\xbd\x93\xe4\xbe\xa5\x46\xba";
 
@@ -54,7 +55,7 @@ struct RuckSackFileEntry {
     int key_size;
     long mtime;
     char *key;
-    char is_open; // flag for when an out stream is writing to this entry
+    int is_open; // flag for when an out stream is writing to this entry
 };
 
 struct RuckSackBundlePrivate {
@@ -224,7 +225,7 @@ static int read_header(struct RuckSackBundlePrivate *b) {
     if (amt_read != MAIN_HEADER_LEN)
         return RuckSackErrorInvalidFormat;
 
-    if (memcmp(BUNDLE_UUID, buf, 16) != 0)
+    if (memcmp(BUNDLE_UUID, buf, UUID_SIZE) != 0)
         return RuckSackErrorInvalidFormat;
 
     int bundle_version = read_uint32be(&buf[16]);
@@ -446,7 +447,7 @@ static int write_header(struct RuckSackBundlePrivate *b) {
         return RuckSackErrorFileAccess;
 
     unsigned char buf[MAX(MAIN_HEADER_LEN, HEADER_ENTRY_LEN)];
-    memcpy(buf, BUNDLE_UUID, 16);
+    memcpy(buf, BUNDLE_UUID, UUID_SIZE);
     write_uint32be(&buf[16], BUNDLE_VERSION);
     write_uint32be(&buf[20], b->first_header_offset);
     write_uint32be(&buf[24], b->header_entry_count);
@@ -1059,7 +1060,7 @@ int rucksack_bundle_add_texture(struct RuckSackBundle *bundle, struct RuckSackTe
         return err;
 
     unsigned char buf[MAX(TEXTURE_HEADER_LEN, IMAGE_HEADER_LEN)];
-    memcpy(&buf[0], TEXTURE_UUID, 16);
+    memcpy(&buf[0], TEXTURE_UUID, UUID_SIZE);
     write_uint32be(&buf[16], image_data_offset);
     write_uint32be(&buf[20], p->images_count);
     write_uint32be(&buf[24], TEXTURE_HEADER_LEN);
@@ -1358,7 +1359,7 @@ int rucksack_file_open_texture(struct RuckSackFileEntry *entry,
         return RuckSackErrorFileAccess;
     }
 
-    if (memcmp(TEXTURE_UUID, buf, 16) != 0)
+    if (memcmp(TEXTURE_UUID, buf, UUID_SIZE) != 0)
         return RuckSackErrorInvalidFormat;
 
     t->pixel_data_offset = read_uint32be(&buf[16]);
@@ -1483,4 +1484,23 @@ void rucksack_image_destroy(struct RuckSackImage *image) {
         return;
     struct RuckSackImagePrivate *img = (struct RuckSackImagePrivate *) image;
     free(img);
+}
+
+int rucksack_file_is_texture(struct RuckSackFileEntry *e, int *is_texture) {
+    struct RuckSackBundlePrivate *b = e->b;
+    if (e->size < UUID_SIZE) {
+        *is_texture = 0;
+        return RuckSackErrorNone;
+    }
+    if (fseek(b->f, e->offset, SEEK_SET))
+        return RuckSackErrorFileAccess;
+
+    unsigned char buf[UUID_SIZE];
+    long int amt_read = fread(buf, 1, UUID_SIZE, b->f);
+    if (amt_read != UUID_SIZE)
+        return RuckSackErrorFileAccess;
+
+    *is_texture = memcmp(TEXTURE_UUID, buf, UUID_SIZE) == 0;
+
+    return RuckSackErrorNone;
 }

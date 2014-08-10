@@ -150,6 +150,8 @@ const char *rucksack_file_name(struct RuckSackFileEntry *entry);
 long rucksack_file_mtime(struct RuckSackFileEntry *entry);
 int rucksack_file_read(struct RuckSackFileEntry *entry, unsigned char *buffer);
 
+/* answer is placed in is_texture; possible error returned */
+int rucksack_file_is_texture(struct RuckSackFileEntry *entry, int *is_texture);
 /* call rucksack_texture_destroy when done */
 int rucksack_file_open_texture(struct RuckSackFileEntry *entry, struct RuckSackTexture **texture);
 

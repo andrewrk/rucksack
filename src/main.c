@@ -949,7 +949,13 @@ static int command_cat(char *arg0, int argc, char *argv[]) {
         return 1;
     }
 
-    if (is_texture) {
+    int entry_is_texture;
+    rs_err = rucksack_file_is_texture(entry, &entry_is_texture);
+    if (rs_err) {
+        fprintf(stderr, "error reading bundle: %s\n", rucksack_err_str(rs_err));
+        return 1;
+    }
+    if (entry_is_texture) {
         struct RuckSackTexture *texture;
         rs_err = rucksack_file_open_texture(entry, &texture);
 
@@ -959,23 +965,51 @@ static int command_cat(char *arg0, int argc, char *argv[]) {
         }
 
         long size = rucksack_texture_size(texture);
+        if (is_texture) {
+            unsigned char *buffer = malloc(size);
+            if (!buffer) {
+                fprintf(stderr, "out of memory\n");
+                return 1;
+            }
+            rs_err = rucksack_texture_read(texture, buffer);
+            if (rs_err) {
+                fprintf(stderr, "unable to read texture entry: %s\n", rucksack_err_str(rs_err));
+                return 1;
+            }
 
-        unsigned char *buffer = malloc(size);
-        if (!buffer) {
-            fprintf(stderr, "out of memory\n");
-            return 1;
+            if (fwrite(buffer, 1, size, stdout) != size) {
+                fprintf(stderr, "error writing to stdout\n");
+                return 1;
+            }
+        } else {
+            printf("{\n");
+            printf("  \"bytes\": %ld,\n", size);
+            printf("  \"maxWidth\": %d,\n", texture->max_width);
+            printf("  \"maxHeight\": %d,\n", texture->max_height);
+            printf("  \"pow2\": %d,\n", texture->pow2);
+            printf("  \"allowRotate90\": %d,\n", texture->allow_r90);
+            printf("  \"images\": {\n");
+            long image_count = rucksack_texture_image_count(texture);
+            struct RuckSackImage **images = malloc(sizeof(struct RuckSackImage *) * image_count);
+            rucksack_texture_get_images(texture, images);
+            for (int i = 0; i < image_count; i += 1) {
+                struct RuckSackImage *image = images[i];
+                printf("    \"%s\": {\n", image->key);
+                printf("      \"x\": %d,\n", image->x);
+                printf("      \"y\": %d,\n", image->y);
+                printf("      \"w\": %d,\n", image->width);
+                printf("      \"h\": %d,\n", image->height);
+                printf("      \"r90\": %d,\n", image->r90);
+                printf("      \"anchor\": {\n");
+                printf("        \"x\": %d,\n", image->anchor_x);
+                printf("        \"y\": %d\n", image->anchor_y);
+                printf("      }\n");
+                printf("    }"); if (i < image_count - 1) printf(","); printf("\n");
+            }
+            printf("  }\n");
+            printf("}\n");
+            free(images);
         }
-        rs_err = rucksack_texture_read(texture, buffer);
-        if (rs_err) {
-            fprintf(stderr, "unable to read texture entry: %s\n", rucksack_err_str(rs_err));
-            return 1;
-        }
-
-        if (fwrite(buffer, 1, size, stdout) != size) {
-            fprintf(stderr, "error writing to stdout\n");
-            return 1;
-        }
-
         rucksack_texture_destroy(texture);
     } else {
         long size = rucksack_file_size(entry);

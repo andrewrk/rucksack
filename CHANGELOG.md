@@ -5,7 +5,7 @@
  * ability to glob for images in a texture.
  * fix not updating bundle when texture properties or image anchor position
    changed in manifest json
- * fix potential crash when adding file to bundle
+ * fix 2 bugs causing crash when adding or updating file in bundle
  * (API breaking) rename all `page` functions to `texture`.
  * (API breaking) rucksack_texture_close removed. Use rucksack_texture_destroy
    instead.

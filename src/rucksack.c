@@ -287,7 +287,7 @@ static struct RuckSackFileEntry *get_prev_entry(struct RuckSackBundlePrivate *b,
     for (int i = 0; i < b->header_entry_count; i += 1) {
         struct RuckSackFileEntry *e = &b->entries[i];
 
-        if (((e->offset < entry->offset) && !prev) || (e->offset > prev->offset))
+        if (((e->offset < entry->offset) && !prev) || (prev && e->offset > prev->offset))
             prev = e;
     }
     return prev;
@@ -300,7 +300,7 @@ static struct RuckSackFileEntry *get_next_entry(struct RuckSackBundlePrivate *b,
     for (int i = 0; i < b->header_entry_count; i += 1) {
         struct RuckSackFileEntry *e = &b->entries[i];
 
-        if (((e->offset > entry->offset) && !next) || (e->offset < next->offset))
+        if (((e->offset > entry->offset) && !next) || (next && e->offset < next->offset))
             next = e;
     }
     return next;

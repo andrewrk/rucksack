@@ -155,6 +155,10 @@ static void test_texture_packing(void) {
     assert(FreeImage_GetWidth(bmp) == 16);
     assert(FreeImage_GetHeight(bmp) == 64);
 
+    FreeImage_Unload(bmp);
+    FreeImage_CloseMemory(fi_mem);
+    free(buffer);
+
     rucksack_texture_destroy(texture);
 
     ok(rucksack_bundle_close(bundle));

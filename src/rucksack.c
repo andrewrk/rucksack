@@ -63,9 +63,9 @@ struct RuckSackBundlePrivate {
     FILE *f;
 
     long int first_header_offset;
-    long int header_entry_count;
     struct RuckSackFileEntry *entries;
-    long int header_entry_mem_size;
+    long int header_entry_count; // actual count of entries
+    long int header_entry_mem_count; // allocated memory entry count
 
     // keep some stuff cached for quick access
     struct RuckSackFileEntry *first_entry;
@@ -233,8 +233,8 @@ static int read_header(struct RuckSackBundlePrivate *b) {
 
     b->first_header_offset = read_uint32be(&buf[20]);
     b->header_entry_count = read_uint32be(&buf[24]);
-    b->header_entry_mem_size = alloc_count(b->header_entry_count);
-    b->entries = calloc(b->header_entry_mem_size, sizeof(struct RuckSackFileEntry));
+    b->header_entry_mem_count = alloc_count(b->header_entry_count);
+    b->entries = calloc(b->header_entry_mem_count, sizeof(struct RuckSackFileEntry));
 
     if (!b->entries)
         return RuckSackErrorNoMem;
@@ -1168,16 +1168,17 @@ static int allocate_file_entry(struct RuckSackBundlePrivate *b, const char *key,
         long int size, struct RuckSackFileEntry **out_entry)
 {
     // create a new entry
-    if (b->header_entry_count >= b->header_entry_mem_size) {
-        b->header_entry_mem_size = alloc_count(b->header_entry_mem_size);
+    if (b->header_entry_count >= b->header_entry_mem_count) {
+        b->header_entry_mem_count = alloc_count(b->header_entry_mem_count);
         struct RuckSackFileEntry *new_ptr = realloc(b->entries,
-                b->header_entry_mem_size * sizeof(struct RuckSackFileEntry));
+                b->header_entry_mem_count * sizeof(struct RuckSackFileEntry));
         if (!new_ptr) {
             *out_entry = NULL;
             return RuckSackErrorNoMem;
         }
-        long int clear_amt = b->header_entry_mem_size - b->header_entry_count;
-        memset(new_ptr + b->header_entry_count, 0, clear_amt);
+        long int clear_amt = b->header_entry_mem_count - b->header_entry_count;
+        long int clear_size = clear_amt * sizeof(struct RuckSackFileEntry);
+        memset(new_ptr + b->header_entry_count, 0, clear_size);
         b->entries = new_ptr;
     }
     struct RuckSackFileEntry *entry = &b->entries[b->header_entry_count];

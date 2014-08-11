@@ -83,18 +83,24 @@ static void test_texture_packing(void) {
 
     img->path = "../test/file0.png";
     img->key = "image0";
+    img->anchor_x = 3;
+    img->anchor_y = 4;
+    img->anchor = RuckSackAnchorExplicit;
     ok(rucksack_texture_add_image(texture, img));
 
     img->path = "../test/file1.png";
     img->key = "image1";
+    img->anchor = RuckSackAnchorCenter;
     ok(rucksack_texture_add_image(texture, img));
 
     img->path = "../test/file2.png";
     img->key = "image2";
+    img->anchor = RuckSackAnchorRight;
     ok(rucksack_texture_add_image(texture, img));
 
     img->path = "../test/file3.png";
     img->key = "image3";
+    img->anchor = RuckSackAnchorLeft;
     ok(rucksack_texture_add_image(texture, img));
     rucksack_image_destroy(img);
 
@@ -129,18 +135,30 @@ static void test_texture_packing(void) {
             got_them[0] = 1;
             assert(image->width == 8);
             assert(image->height == 8);
+            assert(image->anchor_x == 3);
+            assert(image->anchor_y == 4);
+            assert(image->anchor == RuckSackAnchorExplicit);
         } else if (strcmp(image->key, "image1") == 0) {
             got_them[1] = 1;
             assert(image->width == 16);
             assert(image->height == 16);
+            assert(image->anchor_x == 8);
+            assert(image->anchor_y == 8);
+            assert(image->anchor == RuckSackAnchorCenter);
         } else if (strcmp(image->key, "image2") == 0) {
             got_them[2] = 1;
             assert(image->width == 16);
             assert(image->height == 16);
+            assert(image->anchor_x == 16);
+            assert(image->anchor_y == 8);
+            assert(image->anchor == RuckSackAnchorRight);
         } else if (strcmp(image->key, "image3") == 0) {
             got_them[3] = 1;
             assert(image->width == 8);
             assert(image->height == 8);
+            assert(image->anchor_x == 0);
+            assert(image->anchor_y == 4);
+            assert(image->anchor == RuckSackAnchorLeft);
         }
     }
     free(images);

@@ -7,6 +7,8 @@
    changed in manifest json
  * fix 2 bugs causing crash when adding or updating file in bundle
  * cat command: generate JSON data for textures
+ * fix explicit anchor using bogus values
+ * use width/height for anchor position right/bottom instead of width-1/height-1
  * (API breaking) rename all `page` functions to `texture`.
  * (API breaking) rucksack_texture_close removed. Use rucksack_texture_destroy
    instead.

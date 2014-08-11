@@ -634,7 +634,8 @@ int rucksack_texture_add_image(struct RuckSackTexture *texture, struct RuckSackI
     image->anchor = userimg->anchor;
     switch (userimg->anchor) {
         case RuckSackAnchorExplicit:
-            // nothing to do
+            image->anchor_x = userimg->anchor_x;
+            image->anchor_y = userimg->anchor_y;
             break;
         case RuckSackAnchorCenter:
             image->anchor_x = image->width / 2;
@@ -645,7 +646,7 @@ int rucksack_texture_add_image(struct RuckSackTexture *texture, struct RuckSackI
             image->anchor_y = image->height / 2;
             break;
         case RuckSackAnchorRight:
-            image->anchor_x = image->width - 1;
+            image->anchor_x = image->width;
             image->anchor_y = image->height / 2;
             break;
         case RuckSackAnchorTop:
@@ -654,23 +655,23 @@ int rucksack_texture_add_image(struct RuckSackTexture *texture, struct RuckSackI
             break;
         case RuckSackAnchorBottom:
             image->anchor_x = image->width / 2;
-            image->anchor_y = image->height - 1;
+            image->anchor_y = image->height;
             break;
         case RuckSackAnchorTopLeft:
             image->anchor_x = 0;
             image->anchor_y = 0;
             break;
         case RuckSackAnchorTopRight:
-            image->anchor_x = image->width - 1;
+            image->anchor_x = image->width;
             image->anchor_y = 0;
             break;
         case RuckSackAnchorBottomLeft:
             image->anchor_x = 0;
-            image->anchor_y = image->height - 1;
+            image->anchor_y = image->height;
             break;
         case RuckSackAnchorBottomRight:
-            image->anchor_x = image->width - 1;
-            image->anchor_y = image->height - 1;
+            image->anchor_x = image->width;
+            image->anchor_y = image->height;
             break;
         default:
             return RuckSackErrorInvalidAnchor;

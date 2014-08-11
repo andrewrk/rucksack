@@ -586,7 +586,7 @@ static int on_number(struct LaxJsonContext *json, double x) {
             state = StateImagePropAnchorObject;
             break;
         case StateImagePropAnchorY:
-            image->anchor_x = x;
+            image->anchor_y = x;
             state = StateImagePropAnchorObject;
             break;
         case StateImagePropPath:

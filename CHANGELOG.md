@@ -1,3 +1,7 @@
+### 2.0.1
+
+ * fix incorrect fixed point length (16384 instead of 10000)
+
 ### 2.0.0
 
  * ability to open a rucksack bundle which is a 0 byte empty file.

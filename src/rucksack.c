@@ -33,7 +33,7 @@ static const int HEADER_ENTRY_LEN = 36; // not taking into account key bytes
 static const int TEXTURE_HEADER_LEN = 38;
 static const int IMAGE_HEADER_LEN = 37; // not taking into account key bytes
 
-static const float FIXED_POINT_N = 10000.0f;
+static const float FIXED_POINT_N = 16384.0f;
 
 static const char *ERROR_STR[] = {
     "",

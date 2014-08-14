@@ -83,7 +83,7 @@ static void test_texture_packing(void) {
 
     img->path = "../test/file0.png";
     img->key = "image0";
-    img->anchor_x = 3.3f;
+    img->anchor_x = 3.5f;
     img->anchor_y = 4.0f;
     img->anchor = RuckSackAnchorExplicit;
     ok(rucksack_texture_add_image(texture, img));
@@ -135,7 +135,7 @@ static void test_texture_packing(void) {
             got_them[0] = 1;
             assert(image->width == 8);
             assert(image->height == 8);
-            assert(image->anchor_x == 3.3f);
+            assert(image->anchor_x == 3.5f);
             assert(image->anchor_y == 4.0f);
             assert(image->anchor == RuckSackAnchorExplicit);
         } else if (strcmp(image->key, "image1") == 0) {

@@ -14,7 +14,7 @@ single texture, otherwise known as a "sprite sheet".
 ## Command Line Usage
 
 ```
-rucksack v1.0.0
+rucksack v2.0.0
 
 Usage: rucksack [command] [command-options]
 
@@ -187,8 +187,8 @@ below.
     -------+---------
          0 | uint32be size of this image entry header in bytes
          4 | uint32be anchor position enum value
-         8 | uint32be anchor x multiplied by 10000
-        12 | uint32be anchor y multiplied by 10000
+         8 | uint32be anchor x multiplied by 16384
+        12 | uint32be anchor y multiplied by 16384
         16 | uint32be image x
         20 | uint32be image y
         24 | uint32be unrotated image width

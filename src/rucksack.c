@@ -33,6 +33,8 @@ static const int HEADER_ENTRY_LEN = 36; // not taking into account key bytes
 static const int TEXTURE_HEADER_LEN = 38;
 static const int IMAGE_HEADER_LEN = 37; // not taking into account key bytes
 
+static const float FIXED_POINT_N = 10000.0f;
+
 static const char *ERROR_STR[] = {
     "",
     "out of memory",
@@ -129,7 +131,6 @@ static long int alloc_count(long int actual_count) {
     return 2 * actual_count + 64;
 }
 
-
 static void write_uint32be(unsigned char *buf, uint32_t x) {
     buf[3] = x & 0xff;
 
@@ -166,6 +167,10 @@ static void write_uint64be(unsigned char *buf, uint64_t x) {
 
     x >>= 8;
     buf[0] = x & 0xff;
+}
+
+static void write_float32be(unsigned char *buf, float x) {
+    write_uint32be(buf, x * FIXED_POINT_N);
 }
 
 static uint32_t read_uint32be(const unsigned char *buf) {
@@ -208,6 +213,10 @@ static uint64_t read_uint64be(const unsigned char *buf) {
     result |= buf[7];
 
     return result;
+}
+
+static float read_float32be(const unsigned char *buf) {
+    return read_uint32be(buf) / FIXED_POINT_N;
 }
 
 static int read_header(struct RuckSackBundlePrivate *b) {
@@ -638,35 +647,35 @@ int rucksack_texture_add_image(struct RuckSackTexture *texture, struct RuckSackI
             image->anchor_y = userimg->anchor_y;
             break;
         case RuckSackAnchorCenter:
-            image->anchor_x = image->width / 2;
-            image->anchor_y = image->height / 2;
+            image->anchor_x = image->width / 2.0f;
+            image->anchor_y = image->height / 2.0f;
             break;
         case RuckSackAnchorLeft:
-            image->anchor_x = 0;
-            image->anchor_y = image->height / 2;
+            image->anchor_x = 0.0f;
+            image->anchor_y = image->height / 2.0f;
             break;
         case RuckSackAnchorRight:
             image->anchor_x = image->width;
-            image->anchor_y = image->height / 2;
+            image->anchor_y = image->height / 2.0f;
             break;
         case RuckSackAnchorTop:
-            image->anchor_x = image->width / 2;
-            image->anchor_y = 0;
+            image->anchor_x = image->width / 2.0f;
+            image->anchor_y = 0.0f;
             break;
         case RuckSackAnchorBottom:
-            image->anchor_x = image->width / 2;
+            image->anchor_x = image->width / 2.0f;
             image->anchor_y = image->height;
             break;
         case RuckSackAnchorTopLeft:
-            image->anchor_x = 0;
-            image->anchor_y = 0;
+            image->anchor_x = 0.0f;
+            image->anchor_y = 0.0f;
             break;
         case RuckSackAnchorTopRight:
             image->anchor_x = image->width;
-            image->anchor_y = 0;
+            image->anchor_y = 0.0f;
             break;
         case RuckSackAnchorBottomLeft:
-            image->anchor_x = 0;
+            image->anchor_x = 0.0f;
             image->anchor_y = image->height;
             break;
         case RuckSackAnchorBottomRight:
@@ -1080,8 +1089,8 @@ int rucksack_bundle_add_texture(struct RuckSackBundle *bundle, struct RuckSackTe
 
         write_uint32be(&buf[0], IMAGE_HEADER_LEN + image->key_size);
         write_uint32be(&buf[4], image->anchor);
-        write_uint32be(&buf[8], image->anchor_x);
-        write_uint32be(&buf[12], image->anchor_y);
+        write_float32be(&buf[8], image->anchor_x);
+        write_float32be(&buf[12], image->anchor_y);
         write_uint32be(&buf[16], image->x);
         write_uint32be(&buf[20], image->y);
         write_uint32be(&buf[24], image->width);
@@ -1400,8 +1409,8 @@ int rucksack_file_open_texture(struct RuckSackFileEntry *entry,
         next_offset += this_size;
 
         image->anchor = read_uint32be(&buf[4]);
-        image->anchor_x = read_uint32be(&buf[8]);
-        image->anchor_y = read_uint32be(&buf[12]);
+        image->anchor_x = read_float32be(&buf[8]);
+        image->anchor_y = read_float32be(&buf[12]);
         image->x = read_uint32be(&buf[16]);
         image->y = read_uint32be(&buf[20]);
         image->width = read_uint32be(&buf[24]);

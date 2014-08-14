@@ -1001,8 +1001,8 @@ static int command_cat(char *arg0, int argc, char *argv[]) {
                 printf("      \"h\": %d,\n", image->height);
                 printf("      \"r90\": %d,\n", image->r90);
                 printf("      \"anchor\": {\n");
-                printf("        \"x\": %d,\n", image->anchor_x);
-                printf("        \"y\": %d\n", image->anchor_y);
+                printf("        \"x\": %f,\n", image->anchor_x);
+                printf("        \"y\": %f\n", image->anchor_y);
                 printf("      }\n");
                 printf("    }"); if (i < image_count - 1) printf(","); printf("\n");
             }

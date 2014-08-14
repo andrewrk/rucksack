@@ -187,8 +187,8 @@ below.
     -------+---------
          0 | uint32be size of this image entry header in bytes
          4 | uint32be anchor position enum value
-         8 | uint32be anchor x
-        12 | uint32be anchor y
+         8 | uint32be anchor x multiplied by 10000
+        12 | uint32be anchor y multiplied by 10000
         16 | uint32be image x
         20 | uint32be image y
         24 | uint32be unrotated image width

@@ -29,6 +29,7 @@
    instead of separate arguments to rucksack_file_open_texture
  * (API breaking) all API that deals with keys now has a key_size parameter. All
    keys are arrays of bytes with a length, and keys may have null bytes in them.
+ * (API breaking) anchor_x and anchor_y are floats instead of ints
 
 ### 1.0.1
 

@@ -65,8 +65,8 @@ struct RuckSackImage {
     /* defaults to RuckSackAnchorCenter */
     enum RuckSackAnchor anchor;
     /* set these if you set anchor to RuckSackAnchorExplicit */
-    int anchor_x;
-    int anchor_y;
+    float anchor_x;
+    float anchor_y;
 
     /* the following fields are assigned after a call to
      * rucksack_bundle_add_texture and also populated when reading a texture

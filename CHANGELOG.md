@@ -1,4 +1,4 @@
-### 2.0.0 (UNRELEASED)
+### 2.0.0
 
  * ability to open a rucksack bundle which is a 0 byte empty file.
  * added a setting which allows preventing rotating images 90 degrees.

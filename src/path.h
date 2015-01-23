@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Andrew Kelley
+ * Copyright (c) 2015 Andrew Kelley
  *
  * This file is part of rucksack, which is MIT licensed.
  * See http://opensource.org/licenses/MIT

@@ -49,10 +49,12 @@ set(LIB_HEADERS
 set(EXE_SOURCES
   ${PROJECT_SOURCE_DIR}/src/main.c
   ${PROJECT_SOURCE_DIR}/src/path.c
+  ${PROJECT_SOURCE_DIR}/src/stringlist.c
   )
 set(EXE_HEADERS
   ${PROJECT_SOURCE_DIR}/src/rucksack.h
   ${PROJECT_SOURCE_DIR}/src/path.h
+  ${PROJECT_SOURCE_DIR}/src/stringlist.h
   )
 
 set(LIB_CFLAGS "${C99_C_FLAGS} -pedantic -Werror -Wall -Werror=strict-prototypes -Werror=old-style-definition -Werror=missing-prototypes -D_POSIX_C_SOURCE=200809L")
@@ -95,6 +97,11 @@ add_executable(test_path test/test_path.c src/path.c src/path.h)
 set_target_properties(test_path PROPERTIES
   COMPILE_FLAGS ${EXE_CFLAGS})
 add_test(PathUnitTests test_path)
+
+add_executable(test_stringlist test/test_stringlist.c src/stringlist.c src/stringlist.h)
+set_target_properties(test_stringlist PROPERTIES
+  COMPILE_FLAGS ${EXE_CFLAGS})
+add_test(StringListTests test_stringlist)
 
 message("\n"
 "Installation Summary\n"

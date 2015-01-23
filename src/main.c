@@ -16,6 +16,7 @@
 #include <laxjson.h>
 
 #include "rucksack.h"
+#include "stringlist.h"
 #include "path.h"
 
 struct RuckSackBundle *bundle;
@@ -128,6 +129,8 @@ struct RuckSackImage *image = NULL;
 
 static char *path_prefix = ".";
 
+static struct RuckSackStringList *deps_list = NULL;
+
 static char *glob_glob = NULL;
 static char *glob_path = NULL;
 static char *glob_prefix = NULL;
@@ -163,6 +166,13 @@ static const char *JSON_TYPE_STR[] = {
     "Null",
 };
 
+static void ok(enum RuckSackError err) {
+    if (err != RuckSackErrorNone) {
+        fprintf(stderr, "error: %s\n", rucksack_err_str(err));
+        exit(-1);
+    }
+}
+
 static int parse_error(const char *msg) {
     if (parse_err_occurred)
         return -1;
@@ -174,8 +184,11 @@ static int parse_error(const char *msg) {
 
 static char *resolve_path(const char *path) {
     char *out = malloc(2048);
-    if (out)
-        path_resolve(path_prefix, path, out);
+    if (out) {
+        char resolved_path[2048];
+        path_resolve(path_prefix, path, resolved_path);
+        path_relative(path_prefix, resolved_path, out);
+    }
     return out;
 }
 
@@ -272,6 +285,7 @@ static int add_file_if_outdated(struct RuckSackBundle *bundle,
     } else if (verbose) {
         fprintf(stderr, "New file: %s\n", key);
     }
+    ok(rucksack_stringlist_append(deps_list, path, -1));
     int err = rucksack_bundle_add_file(bundle, key, key_size, path);
     if (err) {
         snprintf(strbuf, sizeof(strbuf), "unable to add %s: %s", path, rucksack_err_str(err));
@@ -335,6 +349,7 @@ static int add_glob_match_to_texture(char *key, int key_size, char *path) {
     image->path = path;
     image->key = key;
     image->key_size = key_size;
+    ok(rucksack_stringlist_append(deps_list, path, -1));
     int err = rucksack_texture_add_image(texture, image);
     if (err) {
         snprintf(strbuf, sizeof(strbuf), "unable to add image to texture: %s", rucksack_err_str(err));
@@ -726,6 +741,7 @@ static int on_end(struct LaxJsonContext *json, enum LaxJsonType type) {
         case StateDone:
             return parse_error("unexpected content after EOF");
         case StateImagePropName:
+            ok(rucksack_stringlist_append(deps_list, image->path, -1));
             err = rucksack_texture_add_image(texture, image);
             if (err) {
                 snprintf(strbuf, sizeof(strbuf), "unable to add image to texture: %s", rucksack_err_str(err));
@@ -804,6 +820,7 @@ static int bundle_usage(char *arg0) {
             "Options:\n"
             "  [--prefix path]  assets are loaded relative to this path. defaults to cwd\n"
             "  [--verbose]      print what is happening while it is happening\n"
+            "  [--deps path]    generate a .d dependencies file\n"
             , arg0);
     return 1;
 }
@@ -820,6 +837,7 @@ static int cat_usage(char *arg0) {
 static int command_bundle(char *arg0, int argc, char *argv[]) {
     char *input_filename = NULL;
     char *bundle_filename = NULL;
+    char *deps_filename = NULL;
 
     for (int i = 0; i < argc; i += 1) {
         char *arg = argv[i];
@@ -831,6 +849,8 @@ static int command_bundle(char *arg0, int argc, char *argv[]) {
                 return bundle_usage(arg0);
             } else if (strcmp(arg, "prefix") == 0) {
                 path_prefix = argv[++i];
+            } else if (strcmp(arg, "deps") == 0) {
+                deps_filename = argv[++i];
             } else {
                 return bundle_usage(arg0);
             }
@@ -848,6 +868,11 @@ static int command_bundle(char *arg0, int argc, char *argv[]) {
 
     if (!bundle_filename)
         return bundle_usage(arg0);
+
+    if (deps_filename) {
+        deps_list = rucksack_stringlist_create();
+        rucksack_stringlist_append(deps_list, input_filename, -1);
+    }
 
     FILE *in_f;
     if (strcmp(input_filename, "-") == 0) {
@@ -900,6 +925,34 @@ static int command_bundle(char *arg0, int argc, char *argv[]) {
     if (rs_err) {
         fprintf(stderr, "unable to close bundle: %s\n", rucksack_err_str(rs_err));
         return 1;
+    }
+
+    if (deps_filename) {
+        FILE *deps_f = fopen(deps_filename, "w");
+        if (!deps_f) {
+            fprintf(stderr, "Unable to open %s\n", deps_filename);
+            return 1;
+        }
+
+        int column = fprintf(deps_f, "%s:", bundle_filename);
+        for (int i = 0; i < deps_list->len; i += 1) {
+            struct RuckSackString *dep = &deps_list->strs[i];
+            int new_column = column + dep->len
+                + 1  // space after the prev dep name
+                + 1; // potential backslash on line break
+            if (new_column > 80) {
+                fprintf(deps_f, " \\\n ");
+                column = 1;
+            }
+            column += fprintf(deps_f, " %s", dep->str);
+        }
+        for (int i = 0; i < deps_list->len; i += 1) {
+            struct RuckSackString *dep = &deps_list->strs[i];
+            fprintf(deps_f, "\n\n%s:", dep->str);
+        }
+        fprintf(deps_f, "\n");
+        fclose(deps_f);
+        rucksack_stringlist_destroy(deps_list);
     }
 
     return 0;

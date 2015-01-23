@@ -14,7 +14,7 @@ single texture, otherwise known as a "sprite sheet".
 ## Command Line Usage
 
 ```
-rucksack v2.0.1
+rucksack v2.1.0
 
 Usage: rucksack [command] [command-options]
 

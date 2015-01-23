@@ -1,3 +1,8 @@
+### 2.1.0
+
+ * `bundle` command takes a new parameter `--deps` to create a .d
+   (makefile format) dependencies file
+
 ### 2.0.1
 
  * fix incorrect fixed point length (16384 instead of 10000)

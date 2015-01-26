@@ -166,10 +166,13 @@ static const char *JSON_TYPE_STR[] = {
     "Null",
 };
 
-static void ok(enum RuckSackError err) {
-    if (err != RuckSackErrorNone) {
-        fprintf(stderr, "error: %s\n", rucksack_err_str(err));
-        exit(-1);
+static void append_dep(char *dep) {
+    if (deps_list) {
+        enum RuckSackError err = rucksack_stringlist_append(deps_list, dep, -1);
+        if (err != RuckSackErrorNone) {
+            fprintf(stderr, "error: %s\n", rucksack_err_str(err));
+            exit(-1);
+        }
     }
 }
 
@@ -285,7 +288,7 @@ static int add_file_if_outdated(struct RuckSackBundle *bundle,
     } else if (verbose) {
         fprintf(stderr, "New file: %s\n", key);
     }
-    ok(rucksack_stringlist_append(deps_list, path, -1));
+    append_dep(path);
     int err = rucksack_bundle_add_file(bundle, key, key_size, path);
     if (err) {
         snprintf(strbuf, sizeof(strbuf), "unable to add %s: %s", path, rucksack_err_str(err));
@@ -349,7 +352,7 @@ static int add_glob_match_to_texture(char *key, int key_size, char *path) {
     image->path = path;
     image->key = key;
     image->key_size = key_size;
-    ok(rucksack_stringlist_append(deps_list, path, -1));
+    append_dep(path);
     int err = rucksack_texture_add_image(texture, image);
     if (err) {
         snprintf(strbuf, sizeof(strbuf), "unable to add image to texture: %s", rucksack_err_str(err));
@@ -741,7 +744,7 @@ static int on_end(struct LaxJsonContext *json, enum LaxJsonType type) {
         case StateDone:
             return parse_error("unexpected content after EOF");
         case StateImagePropName:
-            ok(rucksack_stringlist_append(deps_list, image->path, -1));
+            append_dep(image->path);
             err = rucksack_texture_add_image(texture, image);
             if (err) {
                 snprintf(strbuf, sizeof(strbuf), "unable to add image to texture: %s", rucksack_err_str(err));
@@ -871,7 +874,7 @@ static int command_bundle(char *arg0, int argc, char *argv[]) {
 
     if (deps_filename) {
         deps_list = rucksack_stringlist_create();
-        rucksack_stringlist_append(deps_list, input_filename, -1);
+        append_dep(input_filename);
     }
 
     FILE *in_f;

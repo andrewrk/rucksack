@@ -1,3 +1,7 @@
+### 2.1.1
+
+ * fix segfault when not using `--deps` option
+
 ### 2.1.0
 
  * `bundle` command takes a new parameter `--deps` to create a .d

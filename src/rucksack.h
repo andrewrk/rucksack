@@ -112,7 +112,10 @@ int rucksack_bundle_version(void);
 
 const char *rucksack_err_str(int err);
 
+/* open for reading and writing */
 int rucksack_bundle_open(const char *bundle_path, struct RuckSackBundle **bundle);
+/* open read-only */
+int rucksack_bundle_open_read(const char *bundle_path, struct RuckSackBundle **bundle);
 int rucksack_bundle_close(struct RuckSackBundle *bundle);
 
 /* write API */

@@ -75,6 +75,8 @@ struct RuckSackBundlePrivate {
     struct RuckSackFileEntry *last_entry;
     long int headers_byte_count;
     long int first_file_offset;
+
+    char read_only;
 };
 
 struct RuckSackImagePrivate {
@@ -514,8 +516,7 @@ void rucksack_finish(void) {
     FreeImage_DeInitialise();
 }
 
-
-int rucksack_bundle_open(const char *bundle_path, struct RuckSackBundle **out_bundle) {
+static int open_bundle(const char *bundle_path, struct RuckSackBundle **out_bundle, char read_only) {
     struct RuckSackBundlePrivate *b = calloc(1, sizeof(struct RuckSackBundlePrivate));
     if (!b) {
         *out_bundle = NULL;
@@ -523,9 +524,11 @@ int rucksack_bundle_open(const char *bundle_path, struct RuckSackBundle **out_bu
     }
 
     init_new_bundle(b);
+    b->read_only = read_only;
 
+    const char *open_flags = read_only ? "rb" : "rb+";
     int open_for_writing = 0;
-    b->f = fopen(bundle_path, "rb+");
+    b->f = fopen(bundle_path, open_flags);
     if (b->f) {
         int err = read_header(b);
         if (err == RuckSackErrorEmptyFile) {
@@ -539,6 +542,11 @@ int rucksack_bundle_open(const char *bundle_path, struct RuckSackBundle **out_bu
         open_for_writing = 1;
     }
     if (open_for_writing) {
+        if (read_only) {
+            free(b);
+            *out_bundle = NULL;
+            return RuckSackErrorEmptyFile;
+        }
         b->f = fopen(bundle_path, "wb+");
         if (!b->f) {
             free(b);
@@ -551,10 +559,20 @@ int rucksack_bundle_open(const char *bundle_path, struct RuckSackBundle **out_bu
     return RuckSackErrorNone;
 }
 
+int rucksack_bundle_open_read(const char *bundle_path, struct RuckSackBundle **out_bundle) {
+    return open_bundle(bundle_path, out_bundle, 1);
+}
+
+int rucksack_bundle_open(const char *bundle_path, struct RuckSackBundle **out_bundle) {
+    return open_bundle(bundle_path, out_bundle, 0);
+}
+
 int rucksack_bundle_close(struct RuckSackBundle *bundle) {
     struct RuckSackBundlePrivate *b = (struct RuckSackBundlePrivate *)bundle;
 
-    int write_err = write_header(b);
+    int write_err = RuckSackErrorNone;
+    if (!b->read_only)
+        write_err = write_header(b);
 
     if (b->entries) {
         for (int i = 0; i < b->header_entry_count; i += 1) {

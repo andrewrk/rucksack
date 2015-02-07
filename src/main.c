@@ -993,9 +993,9 @@ static int command_cat(char *arg0, int argc, char *argv[]) {
     rucksack_init();
     atexit(rucksack_finish);
 
-    int rs_err = rucksack_bundle_open(bundle_filename, &bundle);
+    int rs_err = rucksack_bundle_open_read(bundle_filename, &bundle);
     if (rs_err) {
-        fprintf(stderr, "unable to open bundle: %s\n", rucksack_err_str(rs_err));
+        fprintf(stderr, "unable to open %s: %s\n", bundle_filename, rucksack_err_str(rs_err));
         return 1;
     }
 
@@ -1132,9 +1132,9 @@ static int command_list(char *arg0, int argc, char *argv[]) {
     rucksack_init();
     atexit(rucksack_finish);
 
-    int rs_err = rucksack_bundle_open(bundle_filename, &bundle);
+    int rs_err = rucksack_bundle_open_read(bundle_filename, &bundle);
     if (rs_err) {
-        fprintf(stderr, "unable to open bundle: %s\n", rucksack_err_str(rs_err));
+        fprintf(stderr, "unable to open %s: %s\n", bundle_filename, rucksack_err_str(rs_err));
         return 1;
     }
 

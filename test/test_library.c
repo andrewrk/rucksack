@@ -12,6 +12,7 @@
 #include <assert.h>
 #include <string.h>
 #include <stdlib.h>
+#include <sys/stat.h>
 #include <FreeImage.h>
 
 static void ok(int err) {
@@ -339,6 +340,40 @@ static void test_non_default_texture_props(void) {
     ok(rucksack_bundle_close(bundle));
 }
 
+static void test_open_read_only(void) {
+    const char *bundle_name = "test.bundle";
+    remove(bundle_name);
+
+    struct RuckSackBundle *bundle;
+    ok(rucksack_bundle_open(bundle_name, &bundle));
+
+    ok(rucksack_bundle_add_file(bundle, "blah", -1, "../test/blah.txt"));
+    ok(rucksack_bundle_add_file(bundle, "g_globby1.txt", -1, "../test/globby/globby1.txt"));
+
+    ok(rucksack_bundle_close(bundle));
+
+    chmod(bundle_name, 0440);
+
+    ok(rucksack_bundle_open_read(bundle_name, &bundle));
+
+    enum RuckSackError err = rucksack_bundle_add_file(bundle, "g_globby2.txt", -1, "../test/globby/globby2.txt");
+    assert(err == RuckSackErrorFileAccess);
+
+    struct RuckSackFileEntry *entry = rucksack_bundle_find_file(bundle, "blah", -1);
+    assert(entry);
+    size_t size = rucksack_file_size(entry);
+    assert(size == 10);
+    char buf[11];
+    ok(rucksack_file_read(entry, (unsigned char *)buf));
+    buf[10] = 0;
+    assert(strcmp(buf, "aoeu\n1234\n") == 0);
+
+    ok(rucksack_bundle_close(bundle));
+
+    chmod(bundle_name, 0660);
+    remove(bundle_name);
+}
+
 struct Test {
     const char *name;
     void (*fn)(void);
@@ -353,6 +388,7 @@ static struct Test tests[] = {
     {"add a file larger than 16KB", test_16kb_file},
     {"write to an empty bundle", test_empty_bundle},
     {"non-default texture properties", test_non_default_texture_props},
+    {"open bundle read-only", test_open_read_only},
     {NULL, NULL},
 };
 

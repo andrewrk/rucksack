@@ -1,3 +1,8 @@
+### 2.2.0
+
+ * ability to open bundle read-only
+ * read-only commands do not create empty bundles when files do not exist
+
 ### 2.1.1
 
  * fix segfault when not using `--deps` option

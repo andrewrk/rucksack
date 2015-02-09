@@ -105,10 +105,10 @@ static const char *STATE_STR[] = {
 
 static enum State state;
 static char parse_err_occurred = 0;
-static char strbuf[2048];
-static char strbuf2[2048];
-static char strbuf3[2048];
-static char strbuf4[2048];
+static char strbuf[4096];
+static char strbuf2[4096];
+static char strbuf3[4096];
+static char strbuf4[4096];
 
 // texture we will add to the bundle
 static struct RuckSackTexture *texture = NULL;
@@ -315,6 +315,8 @@ static int perform_glob(int (*match_callback)(char *key, int key_size, char *pat
         case GLOB_NOMATCH:
             return parse_error("no patterns matched");
     }
+
+    append_dep(*use_glob_path == '0' ? "." : use_glob_path);
 
     for (unsigned int i = 0; i < glob_result.gl_pathc; i += 1) {
         struct stat s;
@@ -1200,7 +1202,7 @@ static int usage(char *arg0) {
             "Commands:\n"
             , major, minor, patch, arg0);
 
-    struct Command *cmd = &commands[0];
+    struct Command *cmd = &commands[2];
 
     while (cmd->name) {
         fprintf(stderr, "  %-10s %s\n", cmd->name, cmd->desc);

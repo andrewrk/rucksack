@@ -19,12 +19,12 @@ enum PathNormalizeState {
     PathNormalizeStateSlashWouldBeParent,
 };
 
-static char strbuf[2048];
-static char strbuf2[2048];
-static char strbuf3[2048];
-static char strbuf4[2048];
-static char strbuf5[2048];
-static char strbuf6[2048];
+static char strbuf[4096];
+static char strbuf2[4096];
+static char strbuf3[4096];
+static char strbuf4[4096];
+static char strbuf5[4096];
+static char strbuf6[4096];
 
 void path_normalize(const char *in_path, char *out_path) {
     char *out_ptr = out_path;

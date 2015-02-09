@@ -538,6 +538,10 @@ static int open_bundle(const char *bundle_path, struct RuckSackBundle **out_bund
             *out_bundle = NULL;
             return err;
         }
+    } else if (read_only) {
+            free(b);
+            *out_bundle = NULL;
+            return RuckSackErrorFileAccess;
     } else {
         open_for_writing = 1;
     }

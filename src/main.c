@@ -909,20 +909,24 @@ static int command_bundle(char *arg0, int argc, char *argv[]) {
         enum LaxJsonError err = lax_json_feed(json, amt_read, buffer);
         if (err) {
             parse_error(ERR_STR[err]);
+            rucksack_bundle_close(bundle);
             return 1;
         }
     }
     enum LaxJsonError err = lax_json_eof(json);
     if (err) {
         parse_error(ERR_STR[err]);
+        rucksack_bundle_close(bundle);
         return 1;
     }
 
     if (state != StateDone)
         parse_error("unexpected EOF");
 
-    if (parse_err_occurred)
+    if (parse_err_occurred) {
+        rucksack_bundle_close(bundle);
         return 1;
+    }
 
     rs_err = rucksack_bundle_close(bundle);
     if (rs_err) {

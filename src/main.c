@@ -1194,16 +1194,16 @@ static int command_strip(char *arg0, int argc, char *argv[]) {
     for (int i = 0; i < argc; i += 1) {
         char *arg = argv[i];
         if (arg[0] == '-' && arg[1] == '-') {
-            return list_usage(arg0);
+            return strip_usage(arg0);
         } else if (!bundle_filename) {
             bundle_filename = arg;
         } else {
-            return list_usage(arg0);
+            return strip_usage(arg0);
         }
     }
 
     if (!bundle_filename)
-        return list_usage(arg0);
+        return strip_usage(arg0);
 
     rucksack_init();
     atexit(rucksack_finish);

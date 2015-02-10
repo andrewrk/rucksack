@@ -20,6 +20,7 @@
 #include "rucksack.h"
 #include "stringlist.h"
 #include "path.h"
+#include "util.h"
 
 struct RuckSackBundle *bundle;
 static char buffer[16384];
@@ -167,6 +168,11 @@ static const char *JSON_TYPE_STR[] = {
     "False",
     "Null",
 };
+
+static char *dupe_c_string(const char *str) {
+    int len = -1;
+    return dupe_string(str, &len);
+}
 
 static void append_dep(char *dep) {
     if (deps_list) {
@@ -555,27 +561,27 @@ static int on_string(struct LaxJsonContext *json, enum LaxJsonType type,
             }
             break;
         case StateGlobValueGlob:
-            glob_glob = strdup(value);
+            glob_glob = dupe_c_string(value);
             state = StateGlobObjectProp;
             break;
         case StateGlobValuePath:
-            glob_path = strdup(value);
+            glob_path = dupe_c_string(value);
             state = StateGlobObjectProp;
             break;
         case StateGlobValuePrefix:
-            glob_prefix = strdup(value);
+            glob_prefix = dupe_c_string(value);
             state = StateGlobObjectProp;
             break;
         case StateGlobImageValueGlob:
-            glob_glob = strdup(value);
+            glob_glob = dupe_c_string(value);
             state = StateGlobImageObjectProp;
             break;
         case StateGlobImageValuePath:
-            glob_path = strdup(value);
+            glob_path = dupe_c_string(value);
             state = StateGlobImageObjectProp;
             break;
         case StateGlobImageValuePrefix:
-            glob_prefix = strdup(value);
+            glob_prefix = dupe_c_string(value);
             state = StateGlobImageObjectProp;
             break;
         default:

@@ -45,6 +45,7 @@ set(LIB_SOURCES
   )
 set(LIB_HEADERS
   ${PROJECT_SOURCE_DIR}/src/rucksack.h
+  ${PROJECT_SOURCE_DIR}/src/util.h
   )
 set(EXE_SOURCES
   ${PROJECT_SOURCE_DIR}/src/main.c

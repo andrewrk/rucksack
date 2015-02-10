@@ -6,6 +6,7 @@
  */
 
 #include "stringlist.h"
+#include "util.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -26,9 +27,7 @@ void rucksack_stringlist_destroy(struct RuckSackStringList *list) {
 enum RuckSackError rucksack_stringlist_append(struct RuckSackStringList *list,
         const char *str, int str_len)
 {
-    if (str_len == -1)
-        str_len = strlen(str);
-    char *s = strndup(str, str_len);
+    char *s = dupe_string(str, &str_len);
 
     if (!s)
         return RuckSackErrorNoMem;

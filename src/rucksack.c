@@ -5,8 +5,9 @@
  * See http://opensource.org/licenses/MIT
  */
 
-#include "rucksack.h"
 #include "config.h"
+#include "rucksack.h"
+#include "util.h"
 
 #include <FreeImage.h>
 #include <stdlib.h>
@@ -1221,9 +1222,15 @@ int rucksack_bundle_add_file(struct RuckSackBundle *bundle, const char *key,
     return RuckSackErrorNone;
 }
 
-static int allocate_file_entry(struct RuckSackBundlePrivate *b, const char *key,
+static int allocate_file_entry(struct RuckSackBundlePrivate *b, const char *key, int key_size,
         long int size, struct RuckSackFileEntry **out_entry, char precise)
 {
+    char *key_dupe = dupe_string(key, &key_size);
+    if (!key_dupe) {
+        *out_entry = NULL;
+        return RuckSackErrorNoMem;
+    }
+
     // create a new entry
     if (b->header_entry_count >= b->header_entry_mem_count) {
         b->header_entry_mem_count = alloc_count(b->header_entry_mem_count);
@@ -1240,8 +1247,8 @@ static int allocate_file_entry(struct RuckSackBundlePrivate *b, const char *key,
     }
     struct RuckSackFileEntry *entry = &b->entries[b->header_entry_count];
     b->header_entry_count += 1;
-    entry->key_size = strlen(key);
-    entry->key = strdup(key);
+    entry->key = key_dupe;
+    entry->key_size = key_size;
     entry->b = b;
     b->headers_byte_count += HEADER_ENTRY_LEN + entry->key_size;
 
@@ -1280,7 +1287,7 @@ static int get_file_entry(struct RuckSackBundlePrivate *b, const char *key,
     }
 
     // none found, allocate new entry
-    return allocate_file_entry(b, key, size, out_entry, precise);
+    return allocate_file_entry(b, key, key_size, size, out_entry, precise);
 }
 
 static int add_stream(struct RuckSackBundle *bundle, const char *key,

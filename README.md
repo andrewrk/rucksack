@@ -14,15 +14,16 @@ single texture, otherwise known as a "sprite sheet".
 ## Command Line Usage
 
 ```
-rucksack v2.2.0
+rucksack v2.3.0
 
-Usage: rucksack [command] [command-options]
+Usage: ./rucksack [command] [command-options]
 
 Commands:
   help       get info on how to use a command
   bundle     parses an assets json file and keeps a bundle up to date
   cat        extracts a single file from the bundle and writes it to stdout
   ls         lists all resources in a bundle
+  strip      make an existing bundle as small as possible
 ```
 
 ## Library Usage

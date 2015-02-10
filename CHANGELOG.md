@@ -1,3 +1,14 @@
+### 2.3.0
+
+ * fix incorrect error value for read-only file not found
+ * fix errors leaving bundle file in invalid state
+ * `--dep` feature: globbing adds dependency on directory timestamp
+ * support path lengths up to 4096 bytes
+ * add API to get the length of an entry key: `rucksack_file_name_size`
+ * fix joining an empty path with the current working directory
+ * add `strip` command to make a bundle as small as possible.
+ * fix several bugs that could result in an invalid bundle
+
 ### 2.2.0
 
  * ability to open bundle read-only

@@ -1318,7 +1318,7 @@ static struct Command commands[] = {
     {"ls", command_list, list_usage,
         "lists all resources in a bundle"},
     {"strip", command_strip, strip_usage,
-        "make a bundle as small as possible"},
+        "make an existing bundle as small as possible"},
     {NULL, NULL, NULL},
 };
 

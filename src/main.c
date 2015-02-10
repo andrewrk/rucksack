@@ -1231,8 +1231,10 @@ static int command_strip(char *arg0, int argc, char *argv[]) {
 
     rucksack_bundle_get_files(bundle, entries);
 
+    long headers_size = rucksack_bundle_get_headers_byte_count(bundle);
+
     struct RuckSackBundle *out_bundle;
-    rs_err = rucksack_bundle_open(tmp_filename, &out_bundle);
+    rs_err = rucksack_bundle_open_precise(tmp_filename, &out_bundle, headers_size);
     if (rs_err) {
         fprintf(stderr, "unable to open %s: %s\n", tmp_filename, rucksack_err_str(rs_err));
         return 1;
@@ -1253,7 +1255,7 @@ static int command_strip(char *arg0, int argc, char *argv[]) {
         int file_name_size = rucksack_file_name_size(e);
         //long file_mtime = rucksack_file_mtime(e);
         struct RuckSackOutStream *stream;
-        rs_err = rucksack_bundle_add_stream(out_bundle, file_name,
+        rs_err = rucksack_bundle_add_stream_precise(out_bundle, file_name,
             file_name_size, file_size, &stream);
         if (rs_err) {
             fprintf(stderr, "unable to add stream: %s\n", rucksack_err_str(rs_err));

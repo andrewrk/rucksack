@@ -8,6 +8,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <time.h>
+#include <unistd.h>
 #include <assert.h>
 #include <glob.h>
 #include <sys/stat.h>
@@ -1171,6 +1173,131 @@ static int command_list(char *arg0, int argc, char *argv[]) {
     return 0;
 }
 
+static int strip_usage(char *arg0) {
+    fprintf(stderr, "Usage: %s strip bundlefile\n", arg0);
+    return 1;
+}
+
+static void get_tmp_name(char *out, int size) {
+   static const char alphanumeric[64] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_";
+   out[0] = '.';
+   for(int i = 1; i < size - 1; i += 1) {
+       int index = rand() % sizeof(alphanumeric);
+       out[i] = alphanumeric[index];
+   }
+   out[size - 1] = 0;
+}
+
+static int command_strip(char *arg0, int argc, char *argv[]) {
+    char *bundle_filename = NULL;
+
+    for (int i = 0; i < argc; i += 1) {
+        char *arg = argv[i];
+        if (arg[0] == '-' && arg[1] == '-') {
+            return list_usage(arg0);
+        } else if (!bundle_filename) {
+            bundle_filename = arg;
+        } else {
+            return list_usage(arg0);
+        }
+    }
+
+    if (!bundle_filename)
+        return list_usage(arg0);
+
+    rucksack_init();
+    atexit(rucksack_finish);
+
+    char rand_str[18];
+    get_tmp_name(rand_str, sizeof(rand_str));
+    path_dirname(bundle_filename, strbuf);
+    path_join(strbuf, rand_str, strbuf2);
+    char *tmp_filename = strbuf2;
+
+    int rs_err = rucksack_bundle_open_read(bundle_filename, &bundle);
+    if (rs_err) {
+        fprintf(stderr, "unable to open %s: %s\n", bundle_filename, rucksack_err_str(rs_err));
+        return 1;
+    }
+
+    size_t count = rucksack_bundle_file_count(bundle);
+
+    struct RuckSackFileEntry **entries = malloc(count * sizeof(struct RuckSackFileEntry *));
+
+    if (!entries) {
+        fprintf(stderr, "out of memory\n");
+        return 1;
+    }
+
+    rucksack_bundle_get_files(bundle, entries);
+
+    struct RuckSackBundle *out_bundle;
+    rs_err = rucksack_bundle_open(tmp_filename, &out_bundle);
+    if (rs_err) {
+        fprintf(stderr, "unable to open %s: %s\n", tmp_filename, rucksack_err_str(rs_err));
+        return 1;
+    }
+    // determine max file size
+    long max_file_size = 0;
+    for (int i = 0; i < count; i += 1) {
+        struct RuckSackFileEntry *e = entries[i];
+        long file_size = rucksack_file_size(e);
+        if (file_size > max_file_size)
+            max_file_size = file_size;
+    }
+    unsigned char *buffer = malloc(max_file_size);
+    for (int i = 0; i < count; i += 1) {
+        struct RuckSackFileEntry *e = entries[i];
+        long file_size = rucksack_file_size(e);
+        const char *file_name = rucksack_file_name(e);
+        int file_name_size = rucksack_file_name_size(e);
+        //long file_mtime = rucksack_file_mtime(e);
+        struct RuckSackOutStream *stream;
+        rs_err = rucksack_bundle_add_stream(out_bundle, file_name,
+            file_name_size, file_size, &stream);
+        if (rs_err) {
+            fprintf(stderr, "unable to add stream: %s\n", rucksack_err_str(rs_err));
+            remove(tmp_filename);
+            return 1;
+        }
+        rs_err = rucksack_file_read(e, buffer);
+        if (rs_err) {
+            fprintf(stderr, "unable to read %s: %s\n", file_name, rucksack_err_str(rs_err));
+            remove(tmp_filename);
+            return 1;
+        }
+        rs_err = rucksack_stream_write(stream, buffer, file_size);
+        if (rs_err) {
+            fprintf(stderr, "unable to write %s: %s\n", file_name, rucksack_err_str(rs_err));
+            remove(tmp_filename);
+            return 1;
+        }
+        rucksack_stream_close(stream);
+    }
+    free(buffer);
+    free(entries);
+
+    rs_err = rucksack_bundle_close(out_bundle);
+    if (rs_err) {
+        fprintf(stderr, "unable to close bundle: %s\n", rucksack_err_str(rs_err));
+        return 1;
+    }
+
+    rs_err = rucksack_bundle_close(bundle);
+    if (rs_err) {
+        fprintf(stderr, "unable to close bundle: %s\n", rucksack_err_str(rs_err));
+        return 1;
+    }
+
+    if (rename(tmp_filename, bundle_filename)) {
+        fprintf(stderr, "unable to rename %s to %s\n", tmp_filename, bundle_filename);
+        remove(tmp_filename);
+        return 1;
+    }
+
+    return 0;
+}
+
 struct Command {
     const char *name;
     int (*exec)(char *arg0, int agc, char *argv[]);
@@ -1188,6 +1315,8 @@ static struct Command commands[] = {
         "extracts a single file from the bundle and writes it to stdout"},
     {"ls", command_list, list_usage,
         "lists all resources in a bundle"},
+    {"strip", command_strip, strip_usage,
+        "make a bundle as small as possible"},
     {NULL, NULL, NULL},
 };
 
@@ -1202,7 +1331,7 @@ static int usage(char *arg0) {
             "Commands:\n"
             , major, minor, patch, arg0);
 
-    struct Command *cmd = &commands[2];
+    struct Command *cmd = &commands[0];
 
     while (cmd->name) {
         fprintf(stderr, "  %-10s %s\n", cmd->name, cmd->desc);
@@ -1210,7 +1339,6 @@ static int usage(char *arg0) {
     }
     return 1;
 }
-
 
 static int command_help(char *arg0, int argc, char *argv[]) {
     if (argc != 1) return help_usage(arg0);
@@ -1236,6 +1364,8 @@ static void cleanup(void) {
 }
 
 int main(int argc, char *argv[]) {
+    srand(time(NULL) + getpid());
+
     image = rucksack_image_create();
     atexit(cleanup);
 

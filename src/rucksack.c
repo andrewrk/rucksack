@@ -1332,6 +1332,10 @@ const char *rucksack_file_name(struct RuckSackFileEntry *entry) {
     return entry->key;
 }
 
+int rucksack_file_name_size(struct RuckSackFileEntry *entry) {
+    return entry->key_size;
+}
+
 int rucksack_file_read(struct RuckSackFileEntry *e, unsigned char *buffer)
 {
     struct RuckSackBundlePrivate *b = e->b;

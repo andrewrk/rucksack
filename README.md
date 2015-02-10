@@ -145,8 +145,8 @@ The main header identifies the file and tells you some metadata about the
 rest of the header entries.
 
 The basic data supported by rucksack is a file. In this case the offset that
-a header entry points to is the raw file data. The other format supported
-is a texture, also known as a spritesheet. This is described by Texture Format
+a header entry points to is the raw file data. Some files in a rucksack bundle
+are textures, also known as spritesheets. This is described by Texture Format
 below.
 
     Offset | Contents

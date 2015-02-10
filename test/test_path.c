@@ -18,6 +18,16 @@ static void test_relative(const char *input1, const char *input2, const char *ex
     assert(strcmp(strbuf, expected) == 0);
 }
 
+static void test_join(const char *input1, const char *input2, const char *expected) {
+    path_join(input1, input2, strbuf);
+    assert(strcmp(strbuf, expected) == 0);
+}
+
+static void test_dirname(const char *input, const char *expected) {
+    path_dirname(input, strbuf);
+    assert(strcmp(strbuf, expected) == 0);
+}
+
 static void test_normalize(const char *input, const char *expected) {
     path_normalize(input, strbuf);
     assert(strcmp(strbuf, expected) == 0);
@@ -64,6 +74,22 @@ static void test_path_relative(void) {
     test_relative("/", "/var/lib", "var/lib");
 }
 
+static void test_path_join(void) {
+    test_join("/a/b", "c/d", "/a/b/c/d");
+    test_join("/a/b/", "c/d", "/a/b/c/d");
+    test_join("/a/b/", "/c/d", "/a/b/c/d");
+    test_join("", "foo", "foo");
+    test_join("", "", "");
+}
+
+static void test_path_dirname(void) {
+    test_dirname("/a/b/c", "/a/b");
+    test_dirname("/a/b/c/", "/a/b");
+    test_dirname("/", "/");
+    test_dirname("", "");
+    test_dirname("a/b/derp.mp3", "a/b");
+}
+
 struct Test {
     const char *name;
     void (*fn)(void);
@@ -72,6 +98,8 @@ struct Test {
 static struct Test tests[] = {
     {"path_normalize", test_path_normalize},
     {"path_relative", test_path_relative},
+    {"path_join", test_path_join},
+    {"path_dirname", test_path_dirname},
     {NULL, NULL},
 };
 

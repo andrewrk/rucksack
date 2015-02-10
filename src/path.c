@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "path.h"
 
@@ -160,8 +161,12 @@ void path_normalize(const char *in_path, char *out_path) {
 }
 
 void path_join(const char *in_path1, const char *in_path2, char *out_path) {
-    snprintf(strbuf, sizeof(strbuf), "%s/%s", in_path1, in_path2);
-    path_normalize(strbuf, out_path);
+    if (*in_path1) {
+        snprintf(strbuf, sizeof(strbuf), "%s/%s", in_path1, in_path2);
+        path_normalize(strbuf, out_path);
+        return;
+    }
+    strcpy(out_path, in_path2);
 }
 
 void path_resolve(const char *from_path, const char *to_path, char *out_path) {
@@ -233,4 +238,32 @@ void path_relative(const char *from, const char *to, char *out_path) {
         out_ptr[-1] = 0;
     else
         out_ptr[0] = 0;
+}
+
+void path_dirname(const char *in_path, char *out_path) {
+    const char *ptr = in_path;
+    const char *last_slash = NULL;
+    while (*ptr) {
+        const char *next = ptr + 1;
+        if (*ptr == '/' && *next)
+            last_slash = ptr;
+        ptr = next;
+    }
+    if (!last_slash) {
+        if (*in_path == '/') {
+            out_path[0] = '/';
+            out_path[1] = 0;
+        } else {
+            out_path[0] = 0;
+        }
+        return;
+    }
+
+    ptr = in_path;
+    while (ptr != last_slash) {
+        *out_path = *ptr;
+        ptr += 1;
+        out_path += 1;
+    }
+    *out_path = 0;
 }

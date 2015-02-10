@@ -18,4 +18,6 @@ void path_resolve(const char *from_path, const char *to_path, char *out_path);
 
 void path_relative(const char *from, const char *to, char *out_path);
 
+void path_dirname(const char *in_path, char *out_path);
+
 #endif /* RUCKSACK_PATH_H_INCLUDED */

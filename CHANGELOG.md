@@ -1,3 +1,7 @@
+### 2.3.2
+
+ * add `#define NDEBUG` to tests to make tests build more portably
+
 ### 2.3.1
 
  * avoid `strdup` and `strndup` for better portability

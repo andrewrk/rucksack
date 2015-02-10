@@ -1,3 +1,7 @@
+### 2.3.1
+
+ * avoid `strdup` and `strndup` for better portability
+
 ### 2.3.0
 
  * fix incorrect error value for read-only file not found

@@ -1253,10 +1253,10 @@ static int command_strip(char *arg0, int argc, char *argv[]) {
         long file_size = rucksack_file_size(e);
         const char *file_name = rucksack_file_name(e);
         int file_name_size = rucksack_file_name_size(e);
-        //long file_mtime = rucksack_file_mtime(e);
+        long file_mtime = rucksack_file_mtime(e);
         struct RuckSackOutStream *stream;
         rs_err = rucksack_bundle_add_stream_precise(out_bundle, file_name,
-            file_name_size, file_size, &stream);
+            file_name_size, file_size, &stream, file_mtime);
         if (rs_err) {
             fprintf(stderr, "unable to add stream: %s\n", rucksack_err_str(rs_err));
             remove(tmp_filename);

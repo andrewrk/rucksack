@@ -1284,7 +1284,8 @@ static int get_file_entry(struct RuckSackBundlePrivate *b, const char *key,
 }
 
 static int add_stream(struct RuckSackBundle *bundle, const char *key,
-        int key_size, long size_guess, struct RuckSackOutStream **out_stream, char precise)
+        int key_size, long size_guess, struct RuckSackOutStream **out_stream,
+        char precise, long mtime)
 {
     struct RuckSackOutStream *stream = calloc(1, sizeof(struct RuckSackOutStream));
 
@@ -1304,22 +1305,23 @@ static int add_stream(struct RuckSackBundle *bundle, const char *key,
     }
     stream->e->is_open = 1;
     stream->e->size = 0;
-    stream->e->mtime = time(0);
+    stream->e->mtime = mtime;
 
     *out_stream = stream;
     return RuckSackErrorNone;
 }
 
 int rucksack_bundle_add_stream_precise(struct RuckSackBundle *bundle,
-        const char *key, int key_size, long size, struct RuckSackOutStream **out_stream)
+        const char *key, int key_size, long size, struct RuckSackOutStream **out_stream,
+        long mtime)
 {
-    return add_stream(bundle, key, key_size, size, out_stream, 1);
+    return add_stream(bundle, key, key_size, size, out_stream, 1, mtime);
 }
 
 int rucksack_bundle_add_stream(struct RuckSackBundle *bundle,
         const char *key, int key_size, long size_guess, struct RuckSackOutStream **out_stream)
 {
-    return add_stream(bundle, key, key_size, size_guess, out_stream, 0);
+    return add_stream(bundle, key, key_size, size_guess, out_stream, 0, time(0));
 }
 
 void rucksack_stream_close(struct RuckSackOutStream *stream) {

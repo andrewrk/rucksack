@@ -136,11 +136,12 @@ int rucksack_bundle_add_file(struct RuckSackBundle *bundle, const char *key,
 int rucksack_bundle_add_stream(struct RuckSackBundle *bundle, const char *key,
         int key_size, long size_guess, struct RuckSackOutStream **stream);
 int rucksack_bundle_add_stream_precise(struct RuckSackBundle *bundle, const char *key,
-        int key_size, long size, struct RuckSackOutStream **stream);
+        int key_size, long size, struct RuckSackOutStream **stream, long mtime);
 
 int rucksack_stream_write(struct RuckSackOutStream *stream, const void *ptr,
         long count);
 void rucksack_stream_close(struct RuckSackOutStream *stream);
+
 
 
 

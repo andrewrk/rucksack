@@ -1,3 +1,12 @@
+/*
+ * Copyright (c) 2015 Andrew Kelley
+ *
+ * This file is part of rucksack, which is MIT licensed.
+ * See http://opensource.org/licenses/MIT
+ */
+
+#undef NDEBUG
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

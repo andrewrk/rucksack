@@ -1354,13 +1354,21 @@ static int unpack_usage(char *arg0) {
     return 1;
 }
 
+static int make_dir(const char *path) {
+#ifdef _WIN32
+    return _mkdir(path);
+#else
+    return mkdir(path, 0777);
+#endif
+}
+
 static int rucksack_mkdirp(const char *path) {
     struct stat st;
     int err = stat(path, &st);
     if (!err && S_ISDIR(st.st_mode))
         return 0;
 
-    err = mkdir(path, 0777);
+    err = make_dir(path);
     if (!err)
         return 0;
     if (errno != ENOENT)

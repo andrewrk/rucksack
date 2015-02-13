@@ -258,6 +258,7 @@ static int add_texture_if_outdated(struct RuckSackBundle *bundle,
             bundle_texture->max_height == texture->max_height &&
             bundle_texture->pow2 == texture->pow2 &&
             bundle_texture->allow_r90 == texture->allow_r90;
+        rucksack_texture_touch(bundle_texture);
         rucksack_texture_destroy(bundle_texture);
         free(bundle_texture_images);
         bundle_texture_images = NULL;
@@ -291,6 +292,7 @@ static int add_file_if_outdated(struct RuckSackBundle *bundle,
         if (file_mtime <= bundle_mtime) {
             if (verbose)
                 fprintf(stderr, "File up to date: %s\n", key);
+            rucksack_file_touch(entry);
             return 0;
         }
         if (verbose)
@@ -936,6 +938,8 @@ static int command_bundle(char *arg0, int argc, char *argv[]) {
         rucksack_bundle_close(bundle);
         return 1;
     }
+
+    rucksack_bundle_delete_untouched(bundle);
 
     rs_err = rucksack_bundle_close(bundle);
     if (rs_err) {

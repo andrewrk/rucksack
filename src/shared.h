@@ -21,19 +21,6 @@ static const int TEXTURE_HEADER_LEN = 38;
 static const int IMAGE_HEADER_LEN = 37; // not taking into account key bytes
 static const float FIXED_POINT_N = 16384.0f;
 
-static void write_uint32be(unsigned char *buf, uint32_t x) {
-    buf[3] = x & 0xff;
-
-    x >>= 8;
-    buf[2] = x & 0xff;
-
-    x >>= 8;
-    buf[1] = x & 0xff;
-
-    x >>= 8;
-    buf[0] = x & 0xff;
-}
-
 struct Rect {
     int x;
     int y;
@@ -71,6 +58,7 @@ struct RuckSackFileEntry {
     long mtime;
     char *key;
     int is_open; // flag for when an out stream is writing to this entry
+    int touched; // flag, set when the entry is written to
 };
 
 struct RuckSackOutStream {
@@ -83,5 +71,18 @@ struct RuckSackImagePrivate {
 
     FIBITMAP *bmp;
 };
+
+static void write_uint32be(unsigned char *buf, uint32_t x) {
+    buf[3] = x & 0xff;
+
+    x >>= 8;
+    buf[2] = x & 0xff;
+
+    x >>= 8;
+    buf[1] = x & 0xff;
+
+    x >>= 8;
+    buf[0] = x & 0xff;
+}
 
 #endif

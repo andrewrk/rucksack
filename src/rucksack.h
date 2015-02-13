@@ -134,6 +134,9 @@ int rucksack_bundle_delete_file(struct RuckSackBundle *bundle, const char *key,
 struct RuckSackTexture *rucksack_texture_create(void);
 void rucksack_texture_destroy(struct RuckSackTexture *texture);
 
+/* mark this texture so that rucksack_bundle_delete_untouched will not delete it */
+void rucksack_texture_touch(struct RuckSackTexture *texture);
+
 
 long rucksack_bundle_file_count(struct RuckSackBundle *bundle);
 void rucksack_bundle_get_files(struct RuckSackBundle *bundle,
@@ -146,6 +149,9 @@ const char *rucksack_file_name(struct RuckSackFileEntry *entry);
 int rucksack_file_name_size(struct RuckSackFileEntry *entry);
 long rucksack_file_mtime(struct RuckSackFileEntry *entry);
 int rucksack_file_read(struct RuckSackFileEntry *entry, unsigned char *buffer);
+
+/* mark this file so that rucksack_bundle_delete_untouched will not delete it */
+void rucksack_file_touch(struct RuckSackFileEntry *entry);
 
 /* answer is placed in is_texture; possible error returned */
 int rucksack_file_is_texture(struct RuckSackFileEntry *entry, int *is_texture);
@@ -164,6 +170,9 @@ void rucksack_texture_get_images(struct RuckSackTexture *texture,
 
 /* usually not needed. used by the `strip` command */
 long rucksack_bundle_get_headers_byte_count(struct RuckSackBundle *bundle);
+
+/* delete all file entries you have not written to while the bundle was open */
+void rucksack_bundle_delete_untouched(struct RuckSackBundle *bundle);
 
 #ifdef __cplusplus
 }

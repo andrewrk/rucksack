@@ -248,6 +248,23 @@ static void test_three_files(void) {
     ok(rucksack_bundle_add_file(bundle, "g_globby1.txt", -1, "../test/globby/globby1.txt"));
     ok(rucksack_bundle_add_file(bundle, "g_globby2.txt", -1, "../test/globby/globby2.txt"));
 
+    rucksack_bundle_delete_untouched(bundle);
+
+    ok(rucksack_bundle_close(bundle));
+
+    ok(rucksack_bundle_open(bundle_name, &bundle));
+
+    long count = rucksack_bundle_file_count(bundle);
+    assert(count == 3);
+
+    ok(rucksack_bundle_add_file(bundle, "g_globby1.txt", -1, "../test/globby/globby1.txt"));
+    ok(rucksack_bundle_add_file(bundle, "g_globby2.txt", -1, "../test/globby/globby2.txt"));
+
+    rucksack_bundle_delete_untouched(bundle);
+
+    count = rucksack_bundle_file_count(bundle);
+    assert(count == 2);
+
     ok(rucksack_bundle_close(bundle));
 }
 

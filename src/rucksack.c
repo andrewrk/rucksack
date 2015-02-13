@@ -681,6 +681,7 @@ static int add_stream(struct RuckSackBundle *bundle, const char *key,
     stream->e->is_open = 1;
     stream->e->size = 0;
     stream->e->mtime = mtime;
+    stream->e->touched = 1;
 
     *out_stream = stream;
     return RuckSackErrorNone;
@@ -943,18 +944,7 @@ long rucksack_bundle_get_headers_byte_count(struct RuckSackBundle *bundle) {
     return b->headers_byte_count;
 }
 
-int rucksack_bundle_delete_file(struct RuckSackBundle *bundle,
-        const char *key, int key_size)
-{
-    struct RuckSackBundlePrivate *b = (struct RuckSackBundlePrivate *)bundle;
-    if (key_size == -1)
-        key_size = strlen(key);
-    struct RuckSackFileEntry *e = find_file_entry(b, key, key_size);
-    if (!e)
-        return RuckSackErrorNotFound;
-    if (e->is_open)
-        return RuckSackErrorStreamOpen;
-
+static void delete_entry(struct RuckSackBundlePrivate *b, struct RuckSackFileEntry *e) {
     long allocated_size = e->allocated_size;
     b->headers_byte_count -= HEADER_ENTRY_LEN + e->key_size;
     b->header_entry_count -= 1;
@@ -973,5 +963,46 @@ int rucksack_bundle_delete_file(struct RuckSackBundle *bundle,
     } else {
         init_new_bundle(b, -1);
     }
+}
+
+int rucksack_bundle_delete_file(struct RuckSackBundle *bundle,
+        const char *key, int key_size)
+{
+    struct RuckSackBundlePrivate *b = (struct RuckSackBundlePrivate *)bundle;
+    if (key_size == -1)
+        key_size = strlen(key);
+    struct RuckSackFileEntry *e = find_file_entry(b, key, key_size);
+    if (!e)
+        return RuckSackErrorNotFound;
+    if (e->is_open)
+        return RuckSackErrorStreamOpen;
+
+    delete_entry(b, e);
     return RuckSackErrorNone;
+}
+
+void rucksack_bundle_delete_untouched(struct RuckSackBundle *bundle) {
+    struct RuckSackBundlePrivate *b = (struct RuckSackBundlePrivate *)bundle;
+    for (;;) {
+        int deleted_something = 0;
+        for (int i = 0; i < b->header_entry_count; i += 1) {
+            struct RuckSackFileEntry *e = &b->entries[i];
+            if (!e->touched) {
+                delete_entry(b, e);
+                deleted_something = 1;
+                break;
+            }
+        }
+        if (!deleted_something)
+            return;
+    }
+}
+
+void rucksack_file_touch(struct RuckSackFileEntry *entry) {
+    entry->touched = 1;
+}
+
+void rucksack_texture_touch(struct RuckSackTexture *texture) {
+    struct RuckSackTexturePrivate *t = (struct RuckSackTexturePrivate *) texture;
+    t->entry->touched = 1;
 }

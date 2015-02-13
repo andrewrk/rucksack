@@ -27,6 +27,7 @@ enum RuckSackError {
     RuckSackErrorNoPixels,
     RuckSackErrorImageFormat,
     RuckSackErrorNotFound,
+    RuckSackErrorStreamOpen,
 };
 
 /* the size of this struct is not part of the public ABI. */
@@ -141,6 +142,9 @@ int rucksack_bundle_add_stream_precise(struct RuckSackBundle *bundle, const char
 int rucksack_stream_write(struct RuckSackOutStream *stream, const void *ptr,
         long count);
 void rucksack_stream_close(struct RuckSackOutStream *stream);
+
+int rucksack_bundle_delete_file(struct RuckSackBundle *bundle, const char *key,
+        int key_size);
 
 
 

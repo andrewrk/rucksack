@@ -48,6 +48,7 @@ static const char *ERROR_STR[] = {
     "image has no pixels",
     "unrecognized image format",
     "key not found",
+    "cannot delete while stream open",
 };
 
 struct RuckSackFileEntry {
@@ -317,7 +318,7 @@ static struct RuckSackFileEntry *get_next_entry(struct RuckSackBundlePrivate *b,
     for (int i = 0; i < b->header_entry_count; i += 1) {
         struct RuckSackFileEntry *e = &b->entries[i];
 
-        if (((e->offset > entry->offset) && !next) || (next && e->offset < next->offset))
+        if (e->offset > entry->offset && (!next || e->offset < next->offset))
             next = e;
     }
     return next;
@@ -441,7 +442,6 @@ static void allocate_file(struct RuckSackBundlePrivate *b, long int size,
 static int resize_file_entry(struct RuckSackBundlePrivate *b,
         struct RuckSackFileEntry *entry, long int size, char precise)
 {
-    // extend the allocation of the thing before the old entry
     if (entry == b->last_entry) {
         // well that was easy
         entry->allocated_size = size;
@@ -1590,4 +1590,37 @@ int rucksack_file_is_texture(struct RuckSackFileEntry *e, int *is_texture) {
 long rucksack_bundle_get_headers_byte_count(struct RuckSackBundle *bundle) {
     struct RuckSackBundlePrivate *b = (struct RuckSackBundlePrivate *) bundle;
     return b->headers_byte_count;
+}
+
+int rucksack_bundle_delete_file(struct RuckSackBundle *bundle,
+        const char *key, int key_size)
+{
+    struct RuckSackBundlePrivate *b = (struct RuckSackBundlePrivate *)bundle;
+    if (key_size == -1)
+        key_size = strlen(key);
+    struct RuckSackFileEntry *e = find_file_entry(b, key, key_size);
+    if (!e)
+        return RuckSackErrorNotFound;
+    if (e->is_open)
+        return RuckSackErrorStreamOpen;
+
+    long allocated_size = e->allocated_size;
+    b->headers_byte_count -= HEADER_ENTRY_LEN + e->key_size;
+    b->header_entry_count -= 1;
+    struct RuckSackFileEntry *prev = get_prev_entry(b, e);
+    struct RuckSackFileEntry *next = get_next_entry(b, e);
+    struct RuckSackFileEntry *next_last = get_prev_entry(b, b->last_entry);
+    if (e->key)
+        free(e->key);
+    *e = *b->last_entry;
+    b->last_entry = next_last;
+    if (prev) {
+        prev->allocated_size += allocated_size;
+    } else if (next) {
+        b->first_entry = next;
+        b->first_file_offset = b->first_entry->offset;
+    } else {
+        init_new_bundle(b, -1);
+    }
+    return RuckSackErrorNone;
 }

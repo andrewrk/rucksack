@@ -374,6 +374,41 @@ static void test_open_read_only(void) {
     remove(bundle_name);
 }
 
+static void test_delete_from_bundle(void) {
+    const char *bundle_name = "test.bundle";
+    remove(bundle_name);
+
+    struct RuckSackBundle *bundle;
+    ok(rucksack_bundle_open(bundle_name, &bundle));
+
+    ok(rucksack_bundle_add_file(bundle, "blah", -1, "../test/blah.txt"));
+    ok(rucksack_bundle_add_file(bundle, "monkey.obj", -1, "../test/monkey.obj"));
+    ok(rucksack_bundle_add_file(bundle, "g_globby1.txt", -1, "../test/globby/globby1.txt"));
+
+    ok(rucksack_bundle_delete_file(bundle, "monkey.obj", -1));
+    assert(rucksack_bundle_delete_file(bundle, "monkey.obj", -1) == RuckSackErrorNotFound);
+
+    ok(rucksack_bundle_add_file(bundle, "g_globby2.txt", -1, "../test/globby/globby2.txt"));
+
+    ok(rucksack_bundle_close(bundle));
+
+    ok(rucksack_bundle_open(bundle_name, &bundle));
+    struct RuckSackFileEntry *entry = rucksack_bundle_find_file(bundle, "g_globby2.txt", -1);
+    assert(entry);
+
+    long size = rucksack_file_size(entry);
+    assert(size == 9);
+
+    unsigned char *buffer = malloc(size);
+    ok(rucksack_file_read(entry, buffer));
+
+    assert(memcmp(buffer, "electric", 8) == 0);
+
+    free(buffer);
+
+    ok(rucksack_bundle_close(bundle));
+}
+
 struct Test {
     const char *name;
     void (*fn)(void);
@@ -389,6 +424,7 @@ static struct Test tests[] = {
     {"write to an empty bundle", test_empty_bundle},
     {"non-default texture properties", test_non_default_texture_props},
     {"open bundle read-only", test_open_read_only},
+    {"delete from a bundle", test_delete_from_bundle},
     {NULL, NULL},
 };
 

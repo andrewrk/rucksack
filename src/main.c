@@ -1306,6 +1306,58 @@ static int command_strip(char *arg0, int argc, char *argv[]) {
     return 0;
 }
 
+static int rm_usage(char *arg0) {
+    fprintf(stderr, "Usage: %s rm bundlefile resourcename\n", arg0);
+    return 1;
+}
+
+static int command_rm(char *arg0, int argc, char *argv[]) {
+    char *bundle_filename = NULL;
+    char *resource_name = NULL;
+
+    for (int i = 0; i < argc; i += 1) {
+        char *arg = argv[i];
+        if (arg[0] == '-' && arg[1] == '-') {
+            return rm_usage(arg0);
+        } else if (!bundle_filename) {
+            bundle_filename = arg;
+        } else if (!resource_name) {
+            resource_name = arg;
+        } else {
+            return rm_usage(arg0);
+        }
+    }
+
+    if (!bundle_filename)
+        return rm_usage(arg0);
+
+    if (!resource_name)
+        return rm_usage(arg0);
+
+    rucksack_init();
+    atexit(rucksack_finish);
+
+    int rs_err = rucksack_bundle_open(bundle_filename, &bundle);
+    if (rs_err) {
+        fprintf(stderr, "unable to open %s: %s\n", bundle_filename, rucksack_err_str(rs_err));
+        return 1;
+    }
+
+    rs_err = rucksack_bundle_delete_file(bundle, resource_name, -1);
+    if (rs_err) {
+        fprintf(stderr, "unable to delete %s: %s\n", resource_name, rucksack_err_str(rs_err));
+        return 1;
+    }
+
+    rs_err = rucksack_bundle_close(bundle);
+    if (rs_err) {
+        fprintf(stderr, "unable to close bundle: %s\n", rucksack_err_str(rs_err));
+        return 1;
+    }
+
+    return 0;
+}
+
 struct Command {
     const char *name;
     int (*exec)(char *arg0, int agc, char *argv[]);
@@ -1323,6 +1375,8 @@ static struct Command commands[] = {
         "extracts a single file from the bundle and writes it to stdout"},
     {"ls", command_list, list_usage,
         "lists all resources in a bundle"},
+    {"rm", command_rm, rm_usage,
+        "remove a file from the bundle"},
     {"strip", command_strip, strip_usage,
         "make an existing bundle as small as possible"},
     {NULL, NULL, NULL},

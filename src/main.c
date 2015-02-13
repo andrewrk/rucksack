@@ -23,6 +23,7 @@
 #include "stringlist.h"
 #include "path.h"
 #include "util.h"
+#include "mkdirp.h"
 
 struct RuckSackBundle *bundle;
 static char buffer[16384];
@@ -1352,35 +1353,6 @@ static int command_rm(char *arg0, int argc, char *argv[]) {
 static int unpack_usage(char *arg0) {
     fprintf(stderr, "Usage: %s unpack bundlefile [outputdir]\n", arg0);
     return 1;
-}
-
-static int make_dir(const char *path) {
-#ifdef _WIN32
-    return _mkdir(path);
-#else
-    return mkdir(path, 0777);
-#endif
-}
-
-static int rucksack_mkdirp(const char *path) {
-    struct stat st;
-    int err = stat(path, &st);
-    if (!err && S_ISDIR(st.st_mode))
-        return 0;
-
-    err = make_dir(path);
-    if (!err)
-        return 0;
-    if (errno != ENOENT)
-        return errno;
-
-    char buf[4096];
-    path_dirname(path, buf);
-    err = rucksack_mkdirp(buf);
-    if (err)
-        return err;
-
-    return rucksack_mkdirp(path);
 }
 
 static void json_escape(const char *str, char *out) {

@@ -70,6 +70,7 @@ set(EXE_HEADERS
   ${PROJECT_SOURCE_DIR}/src/path.h
   ${PROJECT_SOURCE_DIR}/src/stringlist.h
   ${PROJECT_SOURCE_DIR}/src/util.h
+  ${PROJECT_SOURCE_DIR}/src/mkdirp.h
   )
 
 set(LIB_CFLAGS "${C99_C_FLAGS} -pedantic -Werror -Wall -Werror=strict-prototypes -Werror=old-style-definition -Werror=missing-prototypes -D_POSIX_C_SOURCE=200809L")

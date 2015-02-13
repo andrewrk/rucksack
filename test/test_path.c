@@ -90,6 +90,8 @@ static void test_path_dirname(void) {
     test_dirname("/", "/");
     test_dirname("", "");
     test_dirname("a/b/derp.mp3", "a/b");
+    test_dirname("/home", "/");
+    test_dirname("/home/andy", "/home");
 }
 
 struct Test {

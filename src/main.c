@@ -14,6 +14,7 @@
 #include <glob.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <errno.h>
 
 #include <laxjson.h>
 
@@ -1344,6 +1345,197 @@ static int command_rm(char *arg0, int argc, char *argv[]) {
     return 0;
 }
 
+static int unpack_usage(char *arg0) {
+    fprintf(stderr, "Usage: %s unpack bundlefile [outputdir]\n", arg0);
+    return 1;
+}
+
+static int rucksack_mkdirp(const char *path) {
+    struct stat st;
+    int err = stat(path, &st);
+    if (!err && S_ISDIR(st.st_mode))
+        return 0;
+
+    err = mkdir(path, 0777);
+    if (!err)
+        return 0;
+    if (errno != ENOENT)
+        return errno;
+
+    char buf[4096];
+    path_dirname(path, buf);
+    err = rucksack_mkdirp(buf);
+    if (err)
+        return err;
+
+    return rucksack_mkdirp(path);
+}
+
+static void json_escape(const char *str, char *out) {
+    out += sprintf(out, "\"");
+
+    while (*str) {
+        if (*str == '\r') {
+            out += sprintf(out, "\\r");
+        } else if (*str == '\n') {
+            out += sprintf(out, "\\n");
+        } else if (*str == '\\') {
+            out += sprintf(out, "\\\\");
+        } else if (*str == '\t') {
+            out += sprintf(out, "\\t");
+        } else if (*str == '\b') {
+            out += sprintf(out, "\\b");
+        } else if (*str == '\f') {
+            out += sprintf(out, "\\f");
+        } else if (*str < 32 || *str > 126) {
+            out += sprintf(out, "\\x%x", *str);
+        } else {
+            out += sprintf(out, "%c", *str);
+        }
+        str += 1;
+    }
+
+    out += sprintf(out, "\"");
+    *out = 0;
+}
+
+static int command_unpack(char *arg0, int argc, char *argv[]) {
+    const char *bundle_filename = NULL;
+    const char *output_dir = NULL;
+
+    for (int i = 0; i < argc; i += 1) {
+        char *arg = argv[i];
+        if (arg[0] == '-' && arg[1] == '-') {
+            return unpack_usage(arg0);
+        } else if (!bundle_filename) {
+            bundle_filename = arg;
+        } else if (!output_dir) {
+            output_dir = arg;
+        } else {
+            return unpack_usage(arg0);
+        }
+    }
+
+    if (!bundle_filename)
+        return unpack_usage(arg0);
+
+    if (!output_dir) {
+        snprintf(strbuf2, sizeof(strbuf2), "%s%s", bundle_filename, ".dir");
+        output_dir = strbuf2;
+    }
+
+    int rs_err = rucksack_bundle_open(bundle_filename, &bundle);
+    if (rs_err) {
+        fprintf(stderr, "unable to open %s: %s\n", bundle_filename, rucksack_err_str(rs_err));
+        return 1;
+    }
+
+    if (rucksack_mkdirp(output_dir)) {
+        fprintf(stderr, "unable to create directory: %s\n", output_dir);
+        return 1;
+    }
+
+    path_join(output_dir, "manifest.json", strbuf3);
+    FILE *manifest_f = fopen(strbuf3, "w");
+    if (!manifest_f) {
+        fprintf(stderr, "unable to create %s\n", strbuf3);
+        return 1;
+    }
+    fprintf(manifest_f, "{\n");
+    int indent_amt = 2;
+    int indent = indent_amt;
+
+    size_t count = rucksack_bundle_file_count(bundle);
+    struct RuckSackFileEntry **entries = malloc(count * sizeof(struct RuckSackFileEntry *));
+    if (!entries) {
+        fprintf(stderr, "out of memory\n");
+        return 1;
+    }
+    rucksack_bundle_get_files(bundle, entries);
+
+    // determine max file size
+    long max_file_size = 0;
+    for (int i = 0; i < count; i += 1) {
+        struct RuckSackFileEntry *e = entries[i];
+        long file_size = rucksack_file_size(e);
+        if (file_size > max_file_size)
+            max_file_size = file_size;
+    }
+    if (count > 0) {
+        fprintf(manifest_f, "%*sfiles: {\n", indent, "");
+        indent += indent_amt;
+
+        unsigned char *buffer = malloc(max_file_size);
+        if (!buffer) {
+            fprintf(stderr, "out of memory\n");
+            return 1;
+        }
+        for (int i = 0; i < count; i += 1) {
+            struct RuckSackFileEntry *e = entries[i];
+
+            const char *name = rucksack_file_name(e);
+            json_escape(name, strbuf4);
+            fprintf(manifest_f, "%*s%s: {\n", indent, "", strbuf4);
+            indent += indent_amt;
+
+            json_escape(name, strbuf4);
+            fprintf(manifest_f, "%*spath: %s,\n", indent, "", strbuf4);
+
+            indent -= indent_amt;
+            fprintf(manifest_f, "%*s},\n", indent, "");
+
+            path_join(output_dir, name, strbuf);
+            path_dirname(strbuf, strbuf4);
+            if (rucksack_mkdirp(strbuf4)) {
+                fprintf(stderr, "unable to mkdir %s\n", strbuf4);
+                return 1;
+            }
+            FILE *out_f = fopen(strbuf, "wb");
+            if (!out_f) {
+                fprintf(stderr, "unable to open %s\n", strbuf);
+                return 1;
+            }
+
+            rs_err = rucksack_file_read(e, buffer);
+            if (rs_err) {
+                fprintf(stderr, "unable to read %s: %s\n", name, rucksack_err_str(rs_err));
+                return 1;
+            }
+            long file_size = rucksack_file_size(e);
+            size_t amt_written = fwrite(buffer, 1, file_size, out_f);
+            if (amt_written != file_size) {
+                fprintf(stderr, "unable to write %s\n", strbuf);
+                return 1;
+            }
+
+            if (fclose(out_f)) {
+                fprintf(stderr, "unable to close %s\n", strbuf);
+                return 1;
+            }
+
+        }
+        indent -= indent_amt;
+        fprintf(manifest_f, "%*s},\n", indent, "");
+        free(buffer);
+    }
+
+    free(entries);
+
+    fprintf(manifest_f, "}\n");
+    if (fclose(manifest_f)) {
+        fprintf(stderr, "unable to close manifest file\n");
+        return 1;
+    }
+
+    rs_err = rucksack_bundle_close(bundle);
+    if (rs_err) {
+        fprintf(stderr, "unable to close bundle: %s\n", rucksack_err_str(rs_err));
+        return 1;
+    }
+
+    return 0;
+}
+
 struct Command {
     const char *name;
     int (*exec)(char *arg0, int agc, char *argv[]);
@@ -1365,6 +1557,8 @@ static struct Command commands[] = {
         "remove a file from the bundle"},
     {"strip", command_strip, strip_usage,
         "make an existing bundle as small as possible"},
+    {"unpack", command_unpack, unpack_usage,
+        "create a directory with the bundle contents"},
     {NULL, NULL, NULL},
 };
 

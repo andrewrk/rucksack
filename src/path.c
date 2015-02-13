@@ -249,7 +249,7 @@ void path_dirname(const char *in_path, char *out_path) {
             last_slash = ptr;
         ptr = next;
     }
-    if (!last_slash) {
+    if (!last_slash || last_slash == in_path) {
         if (*in_path == '/') {
             out_path[0] = '/';
             out_path[1] = 0;

@@ -1,4 +1,4 @@
-### 3.0.0
+### 3.0.1
 
  * librucksack supports deleting entries
  * add `rm` command to delete entries
@@ -7,6 +7,10 @@
    to link against librucksack.
  * add `unpack` command
  * `bundle` command deletes entries no longer found in manifest file
+
+### 3.0.0
+
+(redacted)
 
 ### 2.3.2
 

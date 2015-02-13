@@ -1,3 +1,13 @@
+### 3.0.0
+
+ * librucksack supports deleting entries
+ * add `rm` command to delete entries
+ * librucksack is now two libraries: librucksack and librucksackspritesheet.
+   librucksack does not depend on FreeImage. Users will typically only need
+   to link against librucksack.
+ * add `unpack` command
+ * `bundle` command deletes entries no longer found in manifest file
+
 ### 2.3.2
 
  * add `#define NDEBUG` to tests to make tests build more portably

@@ -5,18 +5,23 @@
  * See http://opensource.org/licenses/MIT
  */
 
+#include "config.h"
+
+#ifdef RUCKSACK_HAVE_GLOB
+#include <glob.h>
+#endif
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <time.h>
 #include <unistd.h>
 #include <assert.h>
-#include <glob.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <errno.h>
-
 #include <laxjson.h>
+
 
 #include "rucksack.h"
 #include "spritesheet.h"
@@ -311,6 +316,7 @@ static int add_file_if_outdated(struct RuckSackBundle *bundle,
 }
 
 static int perform_glob(int (*match_callback)(char *key, int key_size, char *path)) {
+#ifdef RUCKSACK_HAVE_GLOB
     char *use_glob_str = glob_glob ? glob_glob : "*";
     char *use_glob_path = glob_path ? glob_path : "";
     char *use_glob_prefix = glob_prefix ? glob_prefix : "";
@@ -353,6 +359,9 @@ static int perform_glob(int (*match_callback)(char *key, int key_size, char *pat
     globfree(&glob_result);
 
     return 0;
+#else
+    return parse_error("glob support disabled");
+#endif
 }
 
 static int add_glob_match_to_bundle(char *key, int key_size, char *path) {

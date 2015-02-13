@@ -34,6 +34,9 @@ else()
   set(STATUS_LAXJSON "not found")
 endif()
 
+# check for glob.h
+find_path(RUCKSACK_HAVE_GLOB NAMES glob.h)
+
 configure_file (
   "${PROJECT_SOURCE_DIR}/src/config.h.in"
   "${PROJECT_BINARY_DIR}/config.h"

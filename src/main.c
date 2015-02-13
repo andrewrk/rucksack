@@ -1080,7 +1080,7 @@ static int command_cat(char *arg0, int argc, char *argv[]) {
             printf("}\n");
             free(images);
         }
-        rucksack_texture_destroy(texture);
+        rucksack_texture_close(texture);
     } else {
         long size = rucksack_file_size(entry);
 

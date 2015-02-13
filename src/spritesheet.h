@@ -25,6 +25,11 @@ int rucksack_texture_add_image(struct RuckSackTexture *texture, struct RuckSackI
 
 int rucksack_bundle_add_texture(struct RuckSackBundle *bundle, struct RuckSackTexture *texture);
 
+struct RuckSackTexture *rucksack_texture_create(void);
+
+/* call this to destroy textures created with rucksack_texture_create */
+void rucksack_texture_destroy(struct RuckSackTexture *texture);
+
 
 
 #ifdef __cplusplus

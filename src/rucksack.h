@@ -131,9 +131,6 @@ void rucksack_stream_close(struct RuckSackOutStream *stream);
 int rucksack_bundle_delete_file(struct RuckSackBundle *bundle, const char *key,
         int key_size);
 
-struct RuckSackTexture *rucksack_texture_create(void);
-void rucksack_texture_destroy(struct RuckSackTexture *texture);
-
 /* mark this texture so that rucksack_bundle_delete_untouched will not delete it */
 void rucksack_texture_touch(struct RuckSackTexture *texture);
 
@@ -155,8 +152,10 @@ void rucksack_file_touch(struct RuckSackFileEntry *entry);
 
 /* answer is placed in is_texture; possible error returned */
 int rucksack_file_is_texture(struct RuckSackFileEntry *entry, int *is_texture);
-/* call rucksack_texture_destroy when done */
+/* call rucksack_texture_close when done */
 int rucksack_file_open_texture(struct RuckSackFileEntry *entry, struct RuckSackTexture **texture);
+/* call this to close textures you have opened with rucksack_file_open_texture */
+void rucksack_texture_close(struct RuckSackTexture *texture);
 
 /* get the size of the image data for this texture */
 long rucksack_texture_size(struct RuckSackTexture *texture);

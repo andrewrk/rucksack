@@ -187,7 +187,7 @@ static void test_texture_packing(void) {
     FreeImage_CloseMemory(fi_mem);
     free(buffer);
 
-    rucksack_texture_destroy(texture);
+    rucksack_texture_close(texture);
 
     ok(rucksack_bundle_close(bundle));
 }
@@ -353,7 +353,7 @@ static void test_non_default_texture_props(void) {
     assert(texture->pow2 == 0);
     assert(texture->allow_r90 == 0);
 
-    rucksack_texture_destroy(texture);
+    rucksack_texture_close(texture);
 
     ok(rucksack_bundle_close(bundle));
 }

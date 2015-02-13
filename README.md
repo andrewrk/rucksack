@@ -29,7 +29,7 @@ Commands:
 ## Library Usage
 
 ```C
-#include <rucksack.h>
+#include <rucksack/rucksack.h>
 
 int main() {
     struct RuckSackBundle *bundle;

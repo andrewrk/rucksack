@@ -40,50 +40,85 @@ configure_file (
   )
 include_directories(${PROJECT_BINARY_DIR})
 
-set(LIB_SOURCES
+set(RUCKSACK_LIB_SOURCES
   ${PROJECT_SOURCE_DIR}/src/rucksack.c
   )
-set(LIB_HEADERS
+set(RUCKSACK_LIB_HEADERS
   ${PROJECT_SOURCE_DIR}/src/rucksack.h
   ${PROJECT_SOURCE_DIR}/src/util.h
+  ${PROJECT_SOURCE_DIR}/src/shared.h
   )
+
+set(RUCKSACK_SPRITESHEET_LIB_SOURCES
+  ${PROJECT_SOURCE_DIR}/src/spritesheet.c
+  )
+set(RUCKSACK_SPRITESHEET_LIB_HEADERS
+  ${PROJECT_SOURCE_DIR}/src/spritesheet.h
+  ${PROJECT_SOURCE_DIR}/src/rucksack.h
+  ${PROJECT_SOURCE_DIR}/src/shared.h
+  )
+
 set(EXE_SOURCES
   ${PROJECT_SOURCE_DIR}/src/main.c
   ${PROJECT_SOURCE_DIR}/src/path.c
+  ${PROJECT_SOURCE_DIR}/src/spritesheet.c
   ${PROJECT_SOURCE_DIR}/src/stringlist.c
   )
 set(EXE_HEADERS
   ${PROJECT_SOURCE_DIR}/src/rucksack.h
+  ${PROJECT_SOURCE_DIR}/src/spritesheet.h
   ${PROJECT_SOURCE_DIR}/src/path.h
   ${PROJECT_SOURCE_DIR}/src/stringlist.h
+  ${PROJECT_SOURCE_DIR}/src/util.h
   )
 
 set(LIB_CFLAGS "${C99_C_FLAGS} -pedantic -Werror -Wall -Werror=strict-prototypes -Werror=old-style-definition -Werror=missing-prototypes -D_POSIX_C_SOURCE=200809L")
 set(EXE_CFLAGS ${LIB_CFLAGS})
 
-include_directories(${FreeImage_INCLUDE_DIRS})
-add_library(rucksack_static STATIC ${LIB_SOURCES} ${LIB_HEADERS})
+add_library(rucksack_static STATIC ${RUCKSACK_LIB_SOURCES} ${RUCKSACK_LIB_HEADERS})
 set_target_properties(rucksack_static PROPERTIES
   OUTPUT_NAME rucksack
   COMPILE_FLAGS ${LIB_CFLAGS})
 
-add_library(rucksack_shared SHARED ${LIB_SOURCES} ${LIB_HEADERS})
+add_library(rucksack_shared SHARED ${RUCKSACK_LIB_SOURCES} ${RUCKSACK_LIB_HEADERS})
 set_target_properties(rucksack_shared PROPERTIES
   OUTPUT_NAME rucksack
   SOVERSION ${VERSION_MAJOR}
   VERSION ${VERSION}
   COMPILE_FLAGS ${LIB_CFLAGS})
-target_link_libraries(rucksack_shared ${FreeImage_LIBRARIES})
+
+
+include_directories(${FreeImage_INCLUDE_DIRS})
+add_library(rucksackspritesheet_static STATIC
+  ${RUCKSACK_SPRITESHEET_LIB_SOURCES} ${RUCKSACK_SPRITESHEET_LIB_HEADERS})
+set_target_properties(rucksackspritesheet_static PROPERTIES
+  OUTPUT_NAME rucksackspritesheet
+  COMPILE_FLAGS ${LIB_CFLAGS})
+
+add_library(rucksackspritesheet_shared SHARED
+  ${RUCKSACK_SPRITESHEET_LIB_SOURCES} ${RUCKSACK_SPRITESHEET_LIB_HEADERS})
+set_target_properties(rucksackspritesheet_shared PROPERTIES
+  OUTPUT_NAME rucksackspritesheet
+  SOVERSION ${VERSION_MAJOR}
+  VERSION ${VERSION}
+  COMPILE_FLAGS ${LIB_CFLAGS})
+target_link_libraries(rucksackspritesheet_shared ${FreeImage_LIBRARIES})
+
+
 
 add_executable(rucksack ${EXE_SOURCES} ${EXE_HEADERS})
-target_link_libraries(rucksack rucksack_shared ${LAXJSON_LIBRARY})
+target_link_libraries(rucksack rucksack_shared rucksackspritesheet_shared ${LAXJSON_LIBRARY})
 include_directories(${LAXJSON_INCLUDE_DIR})
 set_target_properties(rucksack PROPERTIES
   COMPILE_FLAGS ${EXE_CFLAGS})
 
 install(TARGETS rucksack DESTINATION bin)
-install(TARGETS rucksack_static rucksack_shared DESTINATION lib)
-install(FILES "src/rucksack.h" DESTINATION include)
+install(TARGETS
+  rucksack_static rucksack_shared
+  rucksackspritesheet_static rucksackspritesheet_shared
+  DESTINATION lib)
+install(FILES "src/rucksack.h" DESTINATION include/rucksack)
+install(FILES "src/spritesheet.h" DESTINATION include/rucksack)
 
 
 enable_testing()
@@ -91,7 +126,7 @@ include_directories("${PROJECT_SOURCE_DIR}/src")
 add_executable(test_library test/test_library.c)
 set_target_properties(test_library PROPERTIES
   COMPILE_FLAGS ${EXE_CFLAGS})
-target_link_libraries(test_library rucksack_shared)
+target_link_libraries(test_library rucksack_shared rucksackspritesheet_shared)
 add_test(LibraryTests test_library)
 
 add_executable(test_path test/test_path.c src/path.c src/path.h)
@@ -108,11 +143,14 @@ message("\n"
 "Installation Summary\n"
 "--------------------\n"
 "* Install Directory            : ${CMAKE_INSTALL_PREFIX}\n"
+"* Build librucksack            : yes\n"
+"* Build librucksackspritesheet : yes\n"
+"* Build rucksack               : yes\n"
 )
 
 message(
-"Required Dependencies\n"
-"------------------\n"
+"System Dependencies\n"
+"-------------------\n"
 "* C99 Compiler                 : ${STATUS_C99}\n"
 "* freeimage                    : ${STATUS_FREEIMG}\n"
 "* laxjson                      : ${STATUS_LAXJSON}\n"

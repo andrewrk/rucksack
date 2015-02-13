@@ -104,10 +104,6 @@ struct RuckSackTexture {
 
 struct RuckSackOutStream;
 
-/* common API */
-void rucksack_init(void);
-void rucksack_finish(void);
-
 void rucksack_version(int *major, int *minor, int *patch);
 int rucksack_bundle_version(void);
 
@@ -121,17 +117,6 @@ int rucksack_bundle_open_precise(const char *bundle_path, struct RuckSackBundle 
 int rucksack_bundle_open_read(const char *bundle_path, struct RuckSackBundle **bundle);
 int rucksack_bundle_close(struct RuckSackBundle *bundle);
 
-/* write API */
-struct RuckSackTexture *rucksack_texture_create(void);
-void rucksack_texture_destroy(struct RuckSackTexture *texture);
-
-struct RuckSackImage *rucksack_image_create(void);
-void rucksack_image_destroy(struct RuckSackImage *image);
-
-/* rucksack copies data from the image you pass here; you still own the memory. */
-int rucksack_texture_add_image(struct RuckSackTexture *texture, struct RuckSackImage *image);
-
-int rucksack_bundle_add_texture(struct RuckSackBundle *bundle, struct RuckSackTexture *texture);
 int rucksack_bundle_add_file(struct RuckSackBundle *bundle, const char *key,
         int key_size, const char *file_name);
 int rucksack_bundle_add_stream(struct RuckSackBundle *bundle, const char *key,
@@ -146,11 +131,10 @@ void rucksack_stream_close(struct RuckSackOutStream *stream);
 int rucksack_bundle_delete_file(struct RuckSackBundle *bundle, const char *key,
         int key_size);
 
+struct RuckSackTexture *rucksack_texture_create(void);
+void rucksack_texture_destroy(struct RuckSackTexture *texture);
 
 
-
-
-/* read API */
 long rucksack_bundle_file_count(struct RuckSackBundle *bundle);
 void rucksack_bundle_get_files(struct RuckSackBundle *bundle,
         struct RuckSackFileEntry **entries);

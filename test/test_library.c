@@ -7,7 +7,8 @@
 
 #undef NDEBUG
 
-#include <rucksack.h>
+#include "rucksack.h"
+#include "spritesheet.h"
 #include <stdio.h>
 #include <assert.h>
 #include <string.h>

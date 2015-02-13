@@ -18,6 +18,7 @@
 #include <laxjson.h>
 
 #include "rucksack.h"
+#include "spritesheet.h"
 #include "stringlist.h"
 #include "path.h"
 #include "util.h"
@@ -898,9 +899,6 @@ static int command_bundle(char *arg0, int argc, char *argv[]) {
         }
     }
 
-    rucksack_init();
-    atexit(rucksack_finish);
-
     int rs_err = rucksack_bundle_open(bundle_filename, &bundle);
     if (rs_err) {
         fprintf(stderr, "unable to open bundle: %s\n", rucksack_err_str(rs_err));
@@ -1003,9 +1001,6 @@ static int command_cat(char *arg0, int argc, char *argv[]) {
 
     if (!resource_name)
         return cat_usage(arg0);
-
-    rucksack_init();
-    atexit(rucksack_finish);
 
     int rs_err = rucksack_bundle_open_read(bundle_filename, &bundle);
     if (rs_err) {
@@ -1143,9 +1138,6 @@ static int command_list(char *arg0, int argc, char *argv[]) {
     if (!bundle_filename)
         return list_usage(arg0);
 
-    rucksack_init();
-    atexit(rucksack_finish);
-
     int rs_err = rucksack_bundle_open_read(bundle_filename, &bundle);
     if (rs_err) {
         fprintf(stderr, "unable to open %s: %s\n", bundle_filename, rucksack_err_str(rs_err));
@@ -1210,9 +1202,6 @@ static int command_strip(char *arg0, int argc, char *argv[]) {
 
     if (!bundle_filename)
         return strip_usage(arg0);
-
-    rucksack_init();
-    atexit(rucksack_finish);
 
     char rand_str[18];
     get_tmp_name(rand_str, sizeof(rand_str));
@@ -1333,9 +1322,6 @@ static int command_rm(char *arg0, int argc, char *argv[]) {
 
     if (!resource_name)
         return rm_usage(arg0);
-
-    rucksack_init();
-    atexit(rucksack_finish);
 
     int rs_err = rucksack_bundle_open(bundle_filename, &bundle);
     if (rs_err) {

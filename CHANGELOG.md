@@ -1,3 +1,9 @@
+### 3.0.2
+
+ * build: use mkdir in a way that works with mingw
+ * build: detect if glob support is available
+ * build: add missing library dependency
+
 ### 3.0.1
 
  * librucksack supports deleting entries

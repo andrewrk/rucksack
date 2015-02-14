@@ -106,7 +106,7 @@ set_target_properties(rucksackspritesheet_shared PROPERTIES
   SOVERSION ${VERSION_MAJOR}
   VERSION ${VERSION}
   COMPILE_FLAGS ${LIB_CFLAGS})
-target_link_libraries(rucksackspritesheet_shared ${FreeImage_LIBRARIES})
+target_link_libraries(rucksackspritesheet_shared rucksack_shared ${FreeImage_LIBRARIES})
 
 
 

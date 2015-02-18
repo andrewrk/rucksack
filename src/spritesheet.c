@@ -66,6 +66,7 @@ int rucksack_texture_add_image(struct RuckSackTexture *texture, struct RuckSackI
     struct RuckSackImage *image = &img->externals;
 
     img->bmp = bmp;
+    img->externals.r90 = userimg->r90;
 
     image->width = FreeImage_GetWidth(bmp);
     image->height = FreeImage_GetHeight(bmp);
@@ -247,22 +248,24 @@ static int do_maxrect_bssf(struct RuckSackTexture *texture) {
             }
 
             // calculate short side fit without rotating
-            int w_len = free_r->w - image->width;
-            int h_len = free_r->h - image->height;
-            int short_side = (w_len < h_len) ? w_len : h_len;
-            int can_fit = w_len > 0 && h_len > 0;
-            if (can_fit && short_side < best_short_side) {
-                best_short_side = short_side;
-                best_rect = free_r;
-                best_short_side_is_r90 = 0;
+            if (!image->r90) {
+                int w_len = free_r->w - image->width;
+                int h_len = free_r->h - image->height;
+                int short_side = (w_len < h_len) ? w_len : h_len;
+                int can_fit = w_len > 0 && h_len > 0;
+                if (can_fit && short_side < best_short_side) {
+                    best_short_side = short_side;
+                    best_rect = free_r;
+                    best_short_side_is_r90 = 0;
+                }
             }
 
             // calculate short side fit with rotating 90 degrees
-            if (texture->allow_r90) {
-                w_len = free_r->w - image->height;
-                h_len = free_r->h - image->width;
-                short_side = (w_len < h_len) ? w_len : h_len;
-                can_fit = w_len > 0 && h_len > 0;
+            if (texture->allow_r90 || image->r90) {
+                int w_len = free_r->w - image->height;
+                int h_len = free_r->h - image->width;
+                int short_side = (w_len < h_len) ? w_len : h_len;
+                int can_fit = w_len > 0 && h_len > 0;
                 if (can_fit && short_side < best_short_side) {
                     best_short_side = short_side;
                     best_rect = free_r;

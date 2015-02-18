@@ -848,6 +848,7 @@ static int bundle_usage(char *arg0) {
             "  [--prefix path]  assets are loaded relative to this path. defaults to cwd\n"
             "  [--verbose]      print what is happening while it is happening\n"
             "  [--deps path]    generate a .d dependencies file\n"
+            "  [--force-r90]    force all spritesheet images to be rotated\n"
             , arg0);
     return 1;
 }
@@ -872,6 +873,8 @@ static int command_bundle(char *arg0, int argc, char *argv[]) {
             arg += 2;
             if (strcmp(arg, "verbose") == 0) {
                 verbose = 1;
+            } else if (strcmp(arg, "force-r90") == 0) {
+                image->r90 = 1;
             } else if (i + 1 >= argc) {
                 return bundle_usage(arg0);
             } else if (strcmp(arg, "prefix") == 0) {

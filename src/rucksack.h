@@ -78,7 +78,9 @@ struct RuckSackImage {
     int x;
     int y;
 
-    /* whether this image is rotated 90 degrees */
+    /* whether this image is rotated 90 degrees
+     * you may set this value to force an image to be rotated which may be
+     * useful for debugging. */
     char r90;
 };
 

@@ -1,3 +1,10 @@
+### 3.1.0
+
+ * `bundle` command has a `--force-r90` flag to make it easier to test code to
+   handle images rotated 90 degrees.
+ * add `rucksack_bundle_open_read_mem` API for reading a rucksack bundle from
+   memory.
+
 ### 3.0.2
 
  * build: use mkdir in a way that works with mingw

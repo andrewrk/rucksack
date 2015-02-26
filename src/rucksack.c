@@ -19,6 +19,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <time.h>
+#include <stdbool.h>
 
 
 #define MIN(x, y) ((x) < (y) ? (x) : (y))
@@ -60,8 +61,38 @@ struct RuckSackBundlePrivate {
     long int headers_byte_count;
     long int first_file_offset;
 
-    char read_only;
+    bool read_only;
+
+    long mem_buffer_size;
+    const char *mem_buffer;
+    long mem_offset;
 };
+
+static int bundle_seek(struct RuckSackBundlePrivate *b, long offset) {
+    if (b->f) {
+        if (fseek(b->f, offset, SEEK_SET))
+            return RuckSackErrorFileAccess;
+        return RuckSackErrorNone;
+    }
+    if (offset >= b->mem_buffer_size)
+        return RuckSackErrorFileAccess;
+    b->mem_offset = offset;
+    return RuckSackErrorNone;
+}
+
+static long bundle_read(struct RuckSackBundlePrivate *b, void *buf, long size) {
+    if (b->f)
+        return fread(buf, 1, size, b->f);
+    long amt_left = b->mem_buffer_size - b->mem_offset;
+    long amt_to_read = MIN(amt_left, size);
+    memcpy(buf, b->mem_buffer + b->mem_offset, amt_to_read);
+    b->mem_offset += amt_to_read;
+    return amt_to_read;
+}
+
+static int bundle_close(struct RuckSackBundlePrivate *b) {
+    return b->f ? fclose(b->f) : 0;
+}
 
 static int memneql(const char *mem1, int mem1_size, const char *mem2, int mem2_size) {
     if (mem1_size != mem2_size)
@@ -155,12 +186,11 @@ static float read_float32be(const unsigned char *buf) {
 
 static int read_header(struct RuckSackBundlePrivate *b) {
     // read all the header entries
-    FILE *f = b->f;
-    if (fseek(f, 0, SEEK_SET))
+    if (bundle_seek(b, 0))
         return RuckSackErrorFileAccess;
 
     unsigned char buf[MAX(HEADER_ENTRY_LEN, MAIN_HEADER_LEN)];
-    long int amt_read = fread(buf, 1, MAIN_HEADER_LEN, f);
+    long amt_read = bundle_read(b, buf, MAIN_HEADER_LEN);
 
     if (amt_read == 0)
         return RuckSackErrorEmptyFile;
@@ -188,9 +218,9 @@ static int read_header(struct RuckSackBundlePrivate *b) {
 
     long int header_offset = b->first_header_offset;
     for (int i = 0; i < b->header_entry_count; i += 1) {
-        if (fseek(f, header_offset, SEEK_SET))
+        if (bundle_seek(b, header_offset))
             return RuckSackErrorFileAccess;
-        amt_read = fread(buf, 1, HEADER_ENTRY_LEN, f);
+        amt_read = bundle_read(b, buf, HEADER_ENTRY_LEN);
         if (amt_read != HEADER_ENTRY_LEN)
             return RuckSackErrorInvalidFormat;
         long int entry_size = read_uint32be(&buf[0]);
@@ -204,7 +234,7 @@ static int read_header(struct RuckSackBundlePrivate *b) {
         entry->key = malloc(entry->key_size + 1);
         if (!entry->key)
             return RuckSackErrorNoMem;
-        amt_read = fread(entry->key, 1, entry->key_size, f);
+        amt_read = bundle_read(b, entry->key, entry->key_size);
         if (amt_read != entry->key_size)
             return RuckSackErrorInvalidFormat;
         entry->key[entry->key_size] = 0;
@@ -445,8 +475,10 @@ static void init_new_bundle(struct RuckSackBundlePrivate *b, long headers_size) 
     b->first_file_offset = b->first_header_offset + allocated_header_bytes;
 }
 
+// when memory is true, bundle_path is the pointer to the memory and
+// headers_size is the length of the memory buffer
 static int open_bundle(const char *bundle_path, struct RuckSackBundle **out_bundle,
-        char read_only, long headers_size)
+        bool read_only, long headers_size, bool memory)
 {
     struct RuckSackBundlePrivate *b = calloc(1, sizeof(struct RuckSackBundlePrivate));
     if (!b) {
@@ -456,6 +488,19 @@ static int open_bundle(const char *bundle_path, struct RuckSackBundle **out_bund
 
     init_new_bundle(b, headers_size);
     b->read_only = read_only;
+
+    if (memory) {
+        b->mem_buffer = bundle_path;
+        b->mem_buffer_size = headers_size;
+        int err = read_header(b);
+        if (err) {
+            free(b);
+            *out_bundle = NULL;
+            return err;
+        }
+        *out_bundle = &b->externals;
+        return RuckSackErrorNone;
+    }
 
     const char *open_flags = read_only ? "rb" : "rb+";
     int open_for_writing = 0;
@@ -495,17 +540,23 @@ static int open_bundle(const char *bundle_path, struct RuckSackBundle **out_bund
 }
 
 int rucksack_bundle_open_read(const char *bundle_path, struct RuckSackBundle **out_bundle) {
-    return open_bundle(bundle_path, out_bundle, 1, -1);
+    return open_bundle(bundle_path, out_bundle, true, -1, false);
 }
 
 int rucksack_bundle_open(const char *bundle_path, struct RuckSackBundle **out_bundle) {
-    return open_bundle(bundle_path, out_bundle, 0, -1);
+    return open_bundle(bundle_path, out_bundle, false, -1, false);
 }
 
 int rucksack_bundle_open_precise(const char *bundle_path, struct RuckSackBundle **out_bundle,
         long headers_size)
 {
-    return open_bundle(bundle_path, out_bundle, 0, headers_size);
+    return open_bundle(bundle_path, out_bundle, false, headers_size, false);
+}
+
+int rucksack_bundle_open_read_mem(const unsigned char *buffer, long size,
+        struct RuckSackBundle **out_bundle)
+{
+    return open_bundle((const char *)buffer, out_bundle, true, size, true);
 }
 
 int rucksack_bundle_close(struct RuckSackBundle *bundle) {
@@ -524,7 +575,7 @@ int rucksack_bundle_close(struct RuckSackBundle *bundle) {
         free(b->entries);
     }
 
-    int close_err = fclose(b->f);
+    int close_err = bundle_close(b);
     free(b);
 
     if (write_err)
@@ -754,9 +805,9 @@ int rucksack_file_name_size(struct RuckSackFileEntry *entry) {
 int rucksack_file_read(struct RuckSackFileEntry *e, unsigned char *buffer)
 {
     struct RuckSackBundlePrivate *b = e->b;
-    if (fseek(b->f, e->offset, SEEK_SET))
+    if (bundle_seek(b, e->offset))
         return RuckSackErrorFileAccess;
-    long int amt_read = fread(buffer, 1, e->size, b->f);
+    long amt_read = bundle_read(b, buffer, e->size);
     if (amt_read != e->size)
         return RuckSackErrorFileAccess;
     return RuckSackErrorNone;
@@ -798,13 +849,13 @@ int rucksack_file_open_texture(struct RuckSackFileEntry *entry,
     t->entry = entry;
 
     struct RuckSackBundlePrivate *b = entry->b;
-    if (fseek(b->f, entry->offset, SEEK_SET)) {
+    if (bundle_seek(b, entry->offset)) {
         rucksack_texture_close(texture);
         return RuckSackErrorFileAccess;
     }
 
     unsigned char buf[MAX(TEXTURE_HEADER_LEN, IMAGE_HEADER_LEN)];
-    long amt_read = fread(buf, 1, TEXTURE_HEADER_LEN, b->f);
+    long amt_read = bundle_read(b, buf, TEXTURE_HEADER_LEN);
     if (amt_read != TEXTURE_HEADER_LEN) {
         rucksack_texture_close(texture);
         return RuckSackErrorFileAccess;
@@ -835,12 +886,12 @@ int rucksack_file_open_texture(struct RuckSackFileEntry *entry,
         struct RuckSackImagePrivate *img = &t->images[i];
         struct RuckSackImage *image = &img->externals;
 
-        if (fseek(b->f, next_offset, SEEK_SET)) {
+        if (bundle_seek(b, next_offset)) {
             rucksack_texture_close(texture);
             return RuckSackErrorFileAccess;
         }
 
-        long amt_read = fread(buf, 1, IMAGE_HEADER_LEN, b->f);
+        long amt_read = bundle_read(b, buf, IMAGE_HEADER_LEN);
         if (amt_read != IMAGE_HEADER_LEN) {
             rucksack_texture_close(texture);
             return RuckSackErrorFileAccess;
@@ -864,7 +915,7 @@ int rucksack_file_open_texture(struct RuckSackFileEntry *entry,
             rucksack_texture_close(texture);
             return RuckSackErrorNoMem;
         }
-        amt_read = fread(image->key, 1, image->key_size, b->f);
+        amt_read = bundle_read(b, image->key, image->key_size);
         if (amt_read != image->key_size) {
             rucksack_texture_close(texture);
             return RuckSackErrorFileAccess;
@@ -887,10 +938,9 @@ long rucksack_texture_size(struct RuckSackTexture *texture) {
 int rucksack_texture_read(struct RuckSackTexture *texture, unsigned char *buffer) {
     struct RuckSackTexturePrivate *t = (struct RuckSackTexturePrivate *) texture;
     struct RuckSackFileEntry *entry = t->entry;
-    FILE *f = entry->b->f;
-    if (fseek(f, entry->offset + t->pixel_data_offset, SEEK_SET))
+    if (bundle_seek(entry->b, entry->offset + t->pixel_data_offset))
         return RuckSackErrorFileAccess;
-    long int amt_read = fread(buffer, 1, t->pixel_data_size, f);
+    long int amt_read = bundle_read(entry->b, buffer, t->pixel_data_size);
     if (amt_read != t->pixel_data_size)
         return RuckSackErrorFileAccess;
     return RuckSackErrorNone;
@@ -926,11 +976,11 @@ int rucksack_file_is_texture(struct RuckSackFileEntry *e, int *is_texture) {
         *is_texture = 0;
         return RuckSackErrorNone;
     }
-    if (fseek(b->f, e->offset, SEEK_SET))
+    if (bundle_seek(b, e->offset))
         return RuckSackErrorFileAccess;
 
     unsigned char buf[UUID_SIZE];
-    long int amt_read = fread(buf, 1, UUID_SIZE, b->f);
+    long int amt_read = bundle_read(b, buf, UUID_SIZE);
     if (amt_read != UUID_SIZE)
         return RuckSackErrorFileAccess;
 
@@ -1021,4 +1071,3 @@ void rucksack_texture_close(struct RuckSackTexture *texture) {
     free(t->free_positions);
     free(t);
 }
-

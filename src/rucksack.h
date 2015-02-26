@@ -117,6 +117,9 @@ int rucksack_bundle_open_precise(const char *bundle_path, struct RuckSackBundle 
         long headers_size);
 /* open read-only */
 int rucksack_bundle_open_read(const char *bundle_path, struct RuckSackBundle **bundle);
+int rucksack_bundle_open_read_mem(const unsigned char *buffer, long size,
+        struct RuckSackBundle **bundle);
+
 int rucksack_bundle_close(struct RuckSackBundle *bundle);
 
 int rucksack_bundle_add_file(struct RuckSackBundle *bundle, const char *key,

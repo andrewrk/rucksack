@@ -16,7 +16,7 @@ single texture, otherwise known as a "sprite sheet".
 ```
 rucksack v3.1.0
 
-Usage: ./rucksack [command] [command-options]
+Usage: rucksack [command] [command-options]
 
 Commands:
   help       get info on how to use a command

@@ -1,6 +1,21 @@
-cmake_minimum_required(VERSION 2.8)
-project(rucksack C)
+cmake_minimum_required(VERSION 2.8.5)
 
+if(CMAKE_VERSION VERSION_LESS 3.0.0)
+    set(CMAKE_INSTALL_LIBDIR "lib" CACHE PATH "library install dir (lib)")
+    set(CMAKE_INSTALL_INCLUDEDIR "include" CACHE PATH "header base install dir (include)")
+    set(CMAKE_INSTALL_BINDIR "bin" CACHE PATH "user executables (bin)")
+else()
+    cmake_policy(SET CMP0042 NEW)
+    cmake_policy(SET CMP0046 NEW)
+    include(GNUInstallDirs)
+endif()
+
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE "Debug" CACHE STRING
+      "Choose the type of build, options are: Debug Release RelWithDebInfo MinSizeRel." FORCE)
+endif()
+
+project(rucksack C)
 set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake ${CMAKE_MODULE_PATH})
 
 set(VERSION_MAJOR 3)
@@ -9,14 +24,6 @@ set(VERSION_PATCH 0)
 
 set(VERSION "${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}")
 message("Configuring rucksack version ${VERSION}")
-
-# check for C99
-find_package(C99)
-if(C99_FLAG_DETECTED)
-  set(STATUS_C99 "OK")
-else(C99_FLAG_DETECTED)
-  set(STATUS_C99 "not found")
-endif(C99_FLAG_DETECTED)
 
 # check for freeimage
 find_package(FreeImage)
@@ -76,7 +83,10 @@ set(EXE_HEADERS
   ${PROJECT_SOURCE_DIR}/src/mkdirp.h
   )
 
-set(LIB_CFLAGS "${C99_C_FLAGS} -pedantic -Werror -Wall -Werror=strict-prototypes -Werror=old-style-definition -Werror=missing-prototypes -D_POSIX_C_SOURCE=200809L")
+
+set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -Werror -pedantic")
+
+set(LIB_CFLAGS "-std=c99 -Wall -Werror=strict-prototypes -Werror=old-style-definition -Werror=missing-prototypes -D_POSIX_C_SOURCE=200809L")
 set(EXE_CFLAGS ${LIB_CFLAGS})
 
 add_library(rucksack_static STATIC ${RUCKSACK_LIB_SOURCES} ${RUCKSACK_LIB_HEADERS})
@@ -147,6 +157,7 @@ message("\n"
 "Installation Summary\n"
 "--------------------\n"
 "* Install Directory            : ${CMAKE_INSTALL_PREFIX}\n"
+"* Build Type                   : ${CMAKE_BUILD_TYPE}\n"
 "* Build librucksack            : yes\n"
 "* Build librucksackspritesheet : yes\n"
 "* Build rucksack               : yes\n"
@@ -158,9 +169,4 @@ message(
 "* C99 Compiler                 : ${STATUS_C99}\n"
 "* freeimage                    : ${STATUS_FREEIMG}\n"
 "* laxjson                      : ${STATUS_LAXJSON}\n"
-)
-
-message(
-"If everything is OK, proceed with\n"
-"make\n"
 )

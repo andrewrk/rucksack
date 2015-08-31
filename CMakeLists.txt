@@ -86,7 +86,7 @@ set(EXE_HEADERS
 
 set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -Werror -pedantic")
 
-set(LIB_CFLAGS "-std=c99 -Wall -Werror=strict-prototypes -Werror=old-style-definition -Werror=missing-prototypes -D_POSIX_C_SOURCE=200809L")
+set(LIB_CFLAGS "-std=c99 -Wall -Werror=strict-prototypes -Werror=old-style-definition -Werror=missing-prototypes -D_POSIX_C_SOURCE=200809L -Wno-gnu-folding-constant")
 set(EXE_CFLAGS ${LIB_CFLAGS})
 
 add_library(rucksack_static STATIC ${RUCKSACK_LIB_SOURCES} ${RUCKSACK_LIB_HEADERS})
